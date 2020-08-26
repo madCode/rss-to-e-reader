@@ -1,0 +1,4 @@
+loading article 0/5
+writing article 0/5
+Email sent!
+Stored all article ids
