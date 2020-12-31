@@ -40,8 +40,8 @@ def get_spectator_article(parser):
     return parser.body.find('main',attrs={'class':'ContentPageBody-module__body__container'})
 
 def get_new_criterion(parser):
-    title = parser.body.find('div',attrs={'class':'article-title-container'})
-    return title + parser.body.find('div',attrs={'class':'article-text-column'})
+    title = parser.body.find('div',attrs={'class':'article-title-container'}).prettify()
+    return BeautifulSoup(title + parser.body.find('div',attrs={'class':'article-text-column'}).prettify(), features='html.parser')
 
 def get_smithsonian_mag(parser):
     return parser.find_all('div',{'class':'article-body pagination-first'})[0]

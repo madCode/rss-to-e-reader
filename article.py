@@ -1,3 +1,5 @@
+from unidecode import unidecode
+
 import article_parser
 import config
 from kindle_html_formatter import clean_for_kindle
@@ -17,7 +19,6 @@ def time_to_read_str(num_words):
 
 class Article:
     def __init__(self, article_id, title, link, content, feed_title, feed_id):
-        print('init article')
         self.id = article_id
         self.link = link
         self.content = content
@@ -38,7 +39,6 @@ class Article:
 
 
     def _hydrate_article(self):
-        print('hydrate')
         if self.feed_id not in config.fetch_content_from_source:
             return
         parseFunction = None
@@ -64,5 +64,5 @@ class Article:
 
 
     def toHtmlString(self,next_id):
-        return f'<a href="#top">[← top]</a><h1 id="{self.id}"><a href="{self.link}">{self.short_title}</a></h1><a href="#{next_id}">[skip →]</a><h2>{self.feed_title}</h2>{self.content}{self.full_content}'
+        return unidecode(f'<a href="#top">[← top]</a><h1 id="{self.id}"><a href="{self.link}">{self.short_title}</a></h1><a href="#{next_id}">[skip →]</a><h2>{self.feed_title}</h2>{self.content}{self.full_content}')
 

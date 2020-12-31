@@ -59,7 +59,6 @@ def main():
     try:
         store = Store()
         store.store_articles(get_articles(store.last_article_id))
-        print('got articles')
         if len(store.articles) == 0:
             print("No articles found!")
             sys.exit(2)
@@ -71,7 +70,6 @@ def main():
         return
 
 def get_articles(last_article_id):
-    print('get articles')
     global time_limit_minutes
     global max_num_articles
     if not test_article_url:
@@ -79,12 +77,10 @@ def get_articles(last_article_id):
         articles = data['articles']
         time_used = data['time_used']
         if max_num_articles is not None:
-            print('max num articles not None')
             max_num_articles -= len(articles)
             if max_num_articles <= 0:
                 return articles
         if time_limit_minutes is not None:
-            print('time limit not None')
             time_limit_minutes -= time_used
             if time_limit_minutes <= 0:
                 return articles
