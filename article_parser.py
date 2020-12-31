@@ -9,11 +9,24 @@ def get_parser(link):
     html_str = response.content.decode("UTF-8")
     return BeautifulSoup(html_str, features="html.parser")
 
+def get_longest_paragraph(para_list):
+    para = para_list[0]
+    max_length = len(para.text)
+    for new_para in para_list:
+        new_text_length = len(new_para.text)
+        if new_text_length > max_length:
+            max_length = new_text_length
+            para = new_para
+    return para
+
+def get_random_paragraph(para_list):
+    index = len(para_list)//4 if len(para_list)//4 < len(para_list) else 0
+    random_para = para_list[index]
+
 def guess_article_from_para(parser):
     all_para = parser.find_all('p')
-    index = len(all_para)//4 if len(all_para)//4 < len(all_para) else 0
-    random_para = all_para[index]
-    return_node = random_para.parent
+    para = get_longest_paragraph(all_para)
+    return_node = para.parent
     attempts = 0
     while len(return_node) <= 1 and attempts < 3:
         return_node = return_node.parent
@@ -45,7 +58,8 @@ def get_the_tls(parser):
     response = requests.get(url, headers=headers)
     response_dict = json.loads(response.content.decode("UTF-8"))
     article = response_dict['content'].replace('\n',' ').strip()
-    return re.sub(r"\s+"," ",article)
+    article_html = re.sub(r"\s+"," ",article)
+    return BeautifulSoup(article_html, features="html.parser")
 
 def get_tablet_mag(parser):
     element = parser.find(text=re.compile('{"@id":"https://www.tabletmag.com/'))
@@ -56,6 +70,24 @@ def get_tablet_mag(parser):
     article_body = '<p>' + re.sub(r'\.([A-Z])', r'.</p><p>\1', article_body) + '</p>'
     html_str = '<html><head></head><body><h4>'+article_title+'</h4>'+article_body+'</body></html>'
     return BeautifulSoup(html_str, features="html.parser").body
+
+def replace_tables_with_divs(content_str):
+    parser = BeautifulSoup(content_str, features="html.parser")
+    tables = parser.find_all('table')
+    if len(tables) == 0:
+        return parser
+    bodies = parser.find_all('tbody')
+    rows = parser.find_all('tr')
+    columns = parser.find_all('td')
+    for table in tables:
+        table.name = 'div'
+    for body in bodies:
+        body.name = 'div'
+    for row in rows:
+        row.name = 'div'
+    for column in columns:
+        column.name = 'div'
+    return parser
 
 special_parsers = {
     'https://www.spectator.co.uk/': get_spectator_article,

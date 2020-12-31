@@ -1,0 +1,13 @@
+# ignore dot files except .gitignore
+.*
+!.gitignore
+
+*.html
+generated_files
+html_files
+job.sh
+weekend_job.sh
+published_posts.sh
+articles.md
+config.py
+__pycache__

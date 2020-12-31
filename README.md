@@ -2,7 +2,7 @@
 
 ## Run the setup file
 1. open terminal and navigate to the folder containing the script
-2. run `./setup.sh` or `./setup.sh --hold-hand`
+2. [IN PROGRESS] run `./setup.sh` or `./setup.sh --hold-hand`
 The setup function does the following:
 	- ensure you have python3, pip3, [BeautifulSoup](LINK), and [unidecode](LINK) installed.
 	- anything that's not installed gets installed
@@ -54,7 +54,7 @@ This can either be a string representing the email you want to send it to, or a 
 
 ## Command-line Arguments
 You have the option to customize the run in three ways:
-"all-unread", "feed-id=", "title=", "do-not-track-last-article", "to-email=", "max-num-articles=", "ignore-skip-list"
+"all-unread", "feed-id=", "title=", "do-not-track-last-article", "to-email=", "limit=", "ignore-skip-list"
 1. `--all-unread`:
 	the --all-unread flag causes the program to ignore the last_article_id and fetch everything unread
 2. `--feed-id <feed_id>`:
@@ -65,8 +65,8 @@ You have the option to customize the run in three ways:
 	the default setup stores the last_article_id in a text file. You can pass the --do-not-track-last-article flag to not do that.
 5. `--to-email "email@email.com"`
 	If, for a single given run, you want to override the `config.to_emails` variable with a single email address, you can use the `--to-email` flag to do so.
-6. `--max-num-articles <num>`
-	Limit the number of articles in your file with this flag.
+6. `--limit <num>`
+	Maximum number of articles in your file with this flag.
 7. `--ignore-skip-list`
 	Let's say I want to enjoy A&L articles only on weekends. I can add the feed_id for A&L (let's pretend it's 3) to `config.ignore_feeds` so that my daily cron job doesn't send any A&L articles. But then I can use `--ignore-skip-list` to run an A&L only job like so: `python3 main.py --feed-id 3 --ignore-skip-list`.
 
@@ -81,16 +81,15 @@ on August 4th 2015 at 8am. This would:
 
 
 Now let's say you ran:
-`python3 main.py --all-unread --feed_id 3 --title "Morning Long Reads" --do-not-track-last-article --max-num-articles 5 --ignore-skip-list --to-email "hello@email.com"`
+`python3 main.py --all-unread --feed_id 3 --title "Morning Long Reads" --do-not-track-last-article --limit 5 --ignore-skip-list --to-email "hello@email.com"`
 on August 4th 2015 at 8am. This would:
-- emails a doc with the title: "Morning Long Reads" to your kindle.
+- emails a doc with the title: "Morning Long Reads" to `hello@email.com`.
 - the doc would contain unread articles from the feed with id 3 (let's say for the sake of argument that it's [Arts & Letters Daily](https://aldaily.com/))
 - the doc would contain 5 unread articles from the Arts & Letters Daily feed. They can be unread articles posted at any time. They don't have to posted after the article in `last_article_id.txt`
 - the script would _not_ update `last_article_id.txt`
-- the doc would be emailed to `hello@email.com`, regardless of what's stored in `config.to_emails`
 
 ## Do some test runs
-You can run `python3 main.py` from the folder the code is contained in to test the python code. And `./job.sh` to test the job file. After the first cron job run, you can check `generated-files/cron_log.txt` to see what the logs from the cron job.
+You can run `python3 main.py` from the folder the code is contained in to test the python code. And `./job.sh` to test the job file. After the first cron job run, you can check `generated_files/cron_log.txt` to see what the logs from the cron job.
 
 ## How to get a feed id
 To print a list of all your feeds, you can run `python3 print_all_feeds.py`. It will print a huge json object that you can copy to a text file and skim to find the feeds you want.
