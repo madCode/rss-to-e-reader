@@ -7,7 +7,7 @@ from store import *
 import sys, getopt
 import ttrss_api
 from markdown_list_manager import get_articles_from_list
-from article import Article
+from article import Article, combine_articles_from_multiple_sources
 
 hour = datetime.datetime.now().hour
 allowed_flags = ["all-unread", "feed-id=", "title=", "do-not-track-last-article", "to-email=", "limit=", "ignore-skip-list", "test_url=", "time_limit_minutes="]
@@ -22,6 +22,8 @@ max_num_articles = None
 ignore_skip_list = False
 test_article_url = None
 time_limit_minutes = None
+from_ttrss = config.ttrss_api_url and len(config.ttrss_api_url) > 0
+from_markdown_list = config.list_file_path and len(config.list_file_path) > 0
 
 def parse_command_line_args(argv):
     global filestub
@@ -73,18 +75,15 @@ def get_articles(last_article_id):
     global time_limit_minutes
     global max_num_articles
     if not test_article_url:
-        data = get_articles_from_list(time_limit_minutes, max_num_articles)
-        articles = data['articles']
-        time_used = data['time_used']
-        if max_num_articles is not None:
-            max_num_articles -= len(articles)
-            if max_num_articles <= 0:
-                return articles
-        if time_limit_minutes is not None:
-            time_limit_minutes -= time_used
-            if time_limit_minutes <= 0:
-                return articles
-        return articles + ttrss_api.get_articles(last_article_id, fetch_feed_id, ignore_since, max_num_articles, time_limit_minutes, ignore_skip_list)
+        rss_list, to_read_list = [], []
+        if from_ttrss:
+            rss_list = ttrss_api.get_articles(last_article_id, fetch_feed_id, ignore_since, max_num_articles, time_limit_minutes, ignore_skip_list)
+        if from_markdown_list:
+            data = get_articles_from_list(time_limit_minutes, max_num_articles)
+            to_read_list = data['articles']
+            list_manager = data['list_manager']
+        articles = combine_articles_from_multiple_sources(rss_list, to_read_list, list_manager, time_limit_minutes, max_num_articles)
+        return articles
     else:
         return get_test_article()
 

@@ -1,7 +1,7 @@
 # ignore dot files except .gitignore
 .*
 !.gitignore
-
+install-docker-ubuntu.sh
 *.html
 generated_files
 html_files
@@ -11,3 +11,4 @@ published_posts.sh
 articles.md
 config.py
 __pycache__
+convert_html_to_markdown

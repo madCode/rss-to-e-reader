@@ -1,3 +1,5 @@
+from unidecode import unidecode
+
 from article import time_to_read_str
 
 def get_table_of_contents(articles):
@@ -28,5 +30,6 @@ def create_file(articles, filestub):
             print(f'writing article {i}/{total}')
         i += 1
     content_html += '</body></html>'
+    content_html = unidecode(content_html)
     file.write(content_html)
     file.close()

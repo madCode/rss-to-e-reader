@@ -31,20 +31,14 @@ def get_articles(last_article_id, fetch_feed_id, ignore_since, max_num_articles,
     i = 0
     num_words = 0
     for headline in headlines:
-        print('dealing with headline number:', str(i))
         if time_limit_minutes is not None and time_to_read_in_minutes(num_words) >= time_limit_minutes:
             break
-        if not ignore_skip_list and headline['feed_id'] in config.ignore_feeds:
+        if not ignore_skip_list and int(headline['feed_id']) in config.ignore_feeds:
             continue
-        print('creating article')
         article = Article(headline['id'], headline['title'], headline['link'], headline['content'], headline['feed_title'], headline['feed_id'])
         articles.append(article)
-        print(article.title)
         num_words += article.word_count
         if i%10 == 0:
             print(f'loading article {i}/{total}')
-        print(i)
         i += 1
-        print('added one')
-    print('returning articles')
     return articles
