@@ -1,7 +1,7 @@
 import unittest
 import unittest.mock as mock
 from ArticleMetadata import ArticleMetadata
-from DefaultListCreator import DefaultListCreator
+from DefaultListCreator import ArticleOrder, DefaultListCreator
 from TtrssCollector import TtrssCollector
 
 class TestDefaultListCreator(unittest.TestCase):
@@ -173,7 +173,26 @@ class TestDefaultListCreator(unittest.TestCase):
 
     def test_callback_collectors(self):
         # filters out the articles that aren't relevant to this collector
-        pass
+        article1 = ArticleMetadata("TITLE1","URL","SOURCE")
+        article1.collector_id = 0
+        article2 = ArticleMetadata("TITLE2","URL","SOURCE")
+        article2.collector_id = 0
+        article3 = ArticleMetadata("TITLE3","URL","SOURCE")
+        article3.collector_id = 1
+        article4 = ArticleMetadata("TITLE4","URL","SOURCE")
+        article4.collector_id = 2
+        collector1 = TtrssCollector("API")
+        collector1.used_articles_callback = mock.MagicMock()
+        collector2 = TtrssCollector("API")
+        collector2.used_articles_callback = mock.MagicMock()
+        collector3 = TtrssCollector("API")
+        collector3.used_articles_callback = mock.MagicMock()
+        
+        inst = DefaultListCreator([collector1,collector2,collector3])
+        inst.callback_collectors([article1,article2,article3,article4])
+        collector1.used_articles_callback.assert_called_with([article1,article2])
+        collector2.used_articles_callback.assert_called_with([article3])
+        collector3.used_articles_callback.assert_called_with([article4])
 
     def get_article_metadatas(self):
         collector = TtrssCollector("API")
@@ -183,7 +202,8 @@ class TestDefaultListCreator(unittest.TestCase):
         article4 = ArticleMetadata("TITLE4","URL","SOURCE")
         collector.get_article_metadatas = mock.MagicMock(return_value=[
             article1, article2, article3, article4])
-        
+        collector.used_articles_callback = mock.MagicMock()
+
         collector2 = TtrssCollector("API")
         article5 = ArticleMetadata("TITLE5","URL","SOURCE")
         article6 = ArticleMetadata("TITLE6","URL","SOURCE")
@@ -191,8 +211,20 @@ class TestDefaultListCreator(unittest.TestCase):
         article8 = ArticleMetadata("TITLE8","URL","SOURCE")
         collector2.get_article_metadatas = mock.MagicMock(return_value=[
             article5, article6, article7, article8])
+        collector2.used_articles_callback = mock.MagicMock()
 
-        # calls the right ordering function
+        inst = DefaultListCreator([collector, collector2],ArticleOrder.IN_ORDER, max_num_articles=3, max_per_source_id=1)
+        articles = inst.get_article_metadatas()
         # calls the callback if desired
+        collector.used_articles_callback.assert_called_once_with([article1])
+        collector2.used_articles_callback.assert_called_once_with([article5])
         # returns the right metadata in the right order
-        pass
+        self.assertListEqual(articles, [article1, article5])
+
+        inst = DefaultListCreator([collector, collector2],ArticleOrder.IN_ORDER, max_num_articles=5, max_per_source_id=2)
+        articles = inst.get_article_metadatas()
+        # calls the callback if desired
+        collector.used_articles_callback.assert_called_once_with([article1, article2])
+        collector2.used_articles_callback.assert_called_once_with([article5, article6])
+        # returns the right metadata in the right order
+        self.assertListEqual(articles, [article1, article2, article5, article6])

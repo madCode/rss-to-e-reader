@@ -184,6 +184,7 @@ class DefaultListCreator(ListCreator):
         i = 0
         for collector in self._collectors:
             collector.used_articles_callback([a for a in articles if a.collector_id == i])
+            i += 1
 
     def get_article_metadatas(self) -> List[ArticleMetadata]:
         """
