@@ -1,8 +1,8 @@
-import unittest
-import unittest.mock as mock
 from ArticleMetadata import ArticleMetadata
 from DefaultListCreator import ArticleOrder, DefaultListCreator
 from TtrssCollector import TtrssCollector
+import unittest
+import unittest.mock as mock
 
 class TestDefaultListCreator(unittest.TestCase):
     def test_should_include_article(self):
@@ -26,10 +26,18 @@ class TestDefaultListCreator(unittest.TestCase):
         article4 = ArticleMetadata("TITLE4","URL","SOURCE")
         collector.get_article_metadatas = mock.MagicMock(return_value=[
             article1, article2, article3, article4])
-        inst = DefaultListCreator([collector], max_per_source_id=1)
+        collector2 = TtrssCollector("API")
+        article5 = ArticleMetadata("TITLE5","URL","SOURCE")
+        article6 = ArticleMetadata("TITLE6","URL","SOURCE")
+        article7 = ArticleMetadata("TITLE7","URL","SOURCE1")
+        article8 = ArticleMetadata("TITLE8","URL","SOURCE")
+        collector2.get_article_metadatas = mock.MagicMock(return_value=[
+            article5, article6, article7, article8])
+        inst = DefaultListCreator([collector, collector2], max_per_source_id=1)
         articles = inst._filter_collector_articles()
         self.assertDictEqual(articles, {
-                0:[article1, article3]
+                0:[article1, article3],
+                1:[article5, article7]
             }
         )
     
@@ -160,7 +168,7 @@ class TestDefaultListCreator(unittest.TestCase):
             0:[article1, article2, article3, article4],
             1:[article5, article6, article7, article8]
         })
-        self.assertEquals(len(set(articles)), 4) # contains 4 unique items
+        self.assertEqual(len(set(articles)), 4) # contains 4 unique items
 
         #   three collectors
         inst = DefaultListCreator([TtrssCollector("API"),TtrssCollector("API"),TtrssCollector("API")], max_num_articles=4)
@@ -169,18 +177,18 @@ class TestDefaultListCreator(unittest.TestCase):
             1:[article4, article5],
             2: [article6, article7, article8]
         })
-        self.assertEquals(len(set(articles)), 4) # contains 4 unique items
+        self.assertEqual(len(set(articles)), 4) # contains 4 unique items
 
     def test_callback_collectors(self):
         # filters out the articles that aren't relevant to this collector
         article1 = ArticleMetadata("TITLE1","URL","SOURCE")
-        article1.collector_id = 0
+        article1.set_collector_id('0')
         article2 = ArticleMetadata("TITLE2","URL","SOURCE")
-        article2.collector_id = 0
+        article2.set_collector_id('0')
         article3 = ArticleMetadata("TITLE3","URL","SOURCE")
-        article3.collector_id = 1
+        article3.set_collector_id('1')
         article4 = ArticleMetadata("TITLE4","URL","SOURCE")
-        article4.collector_id = 2
+        article4.set_collector_id('2')
         collector1 = TtrssCollector("API")
         collector1.used_articles_callback = mock.MagicMock()
         collector2 = TtrssCollector("API")

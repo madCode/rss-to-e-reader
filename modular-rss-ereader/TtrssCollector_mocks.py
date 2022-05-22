@@ -25,3 +25,29 @@ MOCK_HEADLINE: TtrssHeadline = {
     'flavor_image': '',
     'flavor_stream': ''
 }
+
+MOCK_HEADLINE_2: TtrssHeadline = {
+    'id': 123,
+    'guid': 'SHA1:12345',
+    'unread': True,
+    'marked': False,
+    'published': False,
+    'updated': 54321,
+    'is_updated': False,
+    'title': 'TITLE TITLE',
+    'link': 'https://www.nytimes.com',
+    'feed_id': '111',
+    'tags': ['sldkjf', 'wpoeir', 'c,mvcvb'],
+    'content': 'COOOOOOOONTENTS',
+    'labels': [],
+    'feed_title': 'FEED TITLE',
+    'comments_count': 0,
+    'comments_link': 'https://www.google.com/comments',
+    'always_display_attachments': False,
+    'author': 'AUTHOR NAME',
+    'score': 0,
+    'note': None,
+    'lang': 'it',
+    'flavor_image': '',
+    'flavor_stream': ''
+}

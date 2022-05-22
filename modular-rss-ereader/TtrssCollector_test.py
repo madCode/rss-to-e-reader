@@ -1,7 +1,7 @@
-import unittest
-import unittest.mock as mock
 from TtrssCollector import TtrssCollector
 from TtrssCollector_mocks import MOCK_HEADLINE
+import unittest
+import unittest.mock as mock
 
 class TestTtrssCollector(unittest.TestCase):
 
@@ -86,7 +86,7 @@ class TestTtrssCollector(unittest.TestCase):
         inst._send_ttrss_post_request.assert_called_with(
             '{"sid":"987","limit":"3","op":"getHeadlines","feed_id":"-4","view_mode":"unread","show_content":"1"}'
             )
-        self.assertEquals(articles, [MOCK_HEADLINE])
+        self.assertEqual(articles, [MOCK_HEADLINE])
 
         # 0
         inst = TtrssCollector("testurl",max_num_articles=0)
@@ -98,7 +98,7 @@ class TestTtrssCollector(unittest.TestCase):
         })
         articles = inst._get_articles_from_ttrss()
         inst._send_ttrss_post_request.assert_not_called()
-        self.assertEquals(articles, [])
+        self.assertEqual(articles, [])
 
         # -1
         inst = TtrssCollector("testurl")
@@ -112,7 +112,7 @@ class TestTtrssCollector(unittest.TestCase):
         inst._send_ttrss_post_request.assert_called_with(
             '{"sid":"987","op":"getHeadlines","feed_id":"-4","view_mode":"unread","show_content":"1"}'
             )
-        self.assertEquals(articles, [MOCK_HEADLINE])
+        self.assertEqual(articles, [MOCK_HEADLINE])
 
     def test_get_articles_from_ttrss_is_cat(self):
         # true
@@ -127,7 +127,7 @@ class TestTtrssCollector(unittest.TestCase):
         inst._send_ttrss_post_request.assert_called_with(
             '{"sid":"987","is_cat":true,"op":"getHeadlines","feed_id":"-4","view_mode":"unread","show_content":"1"}'
             )
-        self.assertEquals(articles, [MOCK_HEADLINE])
+        self.assertEqual(articles, [MOCK_HEADLINE])
 
         # false
         inst = TtrssCollector("testurl")
@@ -141,7 +141,7 @@ class TestTtrssCollector(unittest.TestCase):
         inst._send_ttrss_post_request.assert_called_with(
             '{"sid":"987","op":"getHeadlines","feed_id":"-4","view_mode":"unread","show_content":"1"}'
             )
-        self.assertEquals(articles, [MOCK_HEADLINE])
+        self.assertEqual(articles, [MOCK_HEADLINE])
 
     def test_get_articles_from_ttrss_last_article_id(self):
         # None
@@ -156,7 +156,7 @@ class TestTtrssCollector(unittest.TestCase):
         inst._send_ttrss_post_request.assert_called_with(
             '{"sid":"987","op":"getHeadlines","feed_id":"-4","view_mode":"unread","show_content":"1"}'
             )
-        self.assertEquals(articles, [MOCK_HEADLINE])
+        self.assertEqual(articles, [MOCK_HEADLINE])
 
         # 35
         inst = TtrssCollector("testurl", last_article_id="35")
@@ -170,7 +170,7 @@ class TestTtrssCollector(unittest.TestCase):
         inst._send_ttrss_post_request.assert_called_with(
             '{"sid":"987","op":"getHeadlines","feed_id":"-4","view_mode":"unread","show_content":"1","since_id":"35"}'
             )
-        self.assertEquals(articles, [MOCK_HEADLINE])
+        self.assertEqual(articles, [MOCK_HEADLINE])
 
     def test_get_articles_from_ttrss_error(self):
         # If ttrss result is empty, error
@@ -195,13 +195,13 @@ class TestTtrssCollector(unittest.TestCase):
         articles = inst.get_article_metadatas()
         inst._login.assert_called_once()
         inst._logout.assert_called_once()
-        self.assertEquals(len(articles), 1)
-        self.assertEquals(articles[0].title, MOCK_HEADLINE['title'])
-        self.assertEquals(articles[0].url, MOCK_HEADLINE['link'])
-        self.assertEquals(articles[0].source_id, MOCK_HEADLINE['feed_id'])
-        self.assertEquals(articles[0].content, MOCK_HEADLINE['content'])
-        self.assertEquals(articles[0].source_title, MOCK_HEADLINE['feed_title'])
-        self.assertEquals(articles[0].id, str(MOCK_HEADLINE['id']))
+        self.assertEqual(len(articles), 1)
+        self.assertEqual(articles[0].title, MOCK_HEADLINE['title'])
+        self.assertEqual(articles[0].url, MOCK_HEADLINE['link'])
+        self.assertEqual(articles[0].source_id, MOCK_HEADLINE['feed_id'])
+        self.assertEqual(articles[0].content, MOCK_HEADLINE['content'])
+        self.assertEqual(articles[0].source_title, MOCK_HEADLINE['feed_title'])
+        self.assertEqual(articles[0].id, str(MOCK_HEADLINE['id']))
         self.assertFalse(articles[0].fetch_content_from_url)
 
     def test_get_article_metadatas_failed_logout(self):
@@ -219,13 +219,13 @@ class TestTtrssCollector(unittest.TestCase):
         articles = inst.get_article_metadatas()
         inst._login.assert_called_once()
         inst._logout.assert_called_once()
-        self.assertEquals(len(articles), 1)
-        self.assertEquals(articles[0].title, MOCK_HEADLINE['title'])
-        self.assertEquals(articles[0].url, MOCK_HEADLINE['link'])
-        self.assertEquals(articles[0].source_id, MOCK_HEADLINE['feed_id'])
-        self.assertEquals(articles[0].content, MOCK_HEADLINE['content'])
-        self.assertEquals(articles[0].source_title, MOCK_HEADLINE['feed_title'])
-        self.assertEquals(articles[0].id, str(MOCK_HEADLINE['id']))
+        self.assertEqual(len(articles), 1)
+        self.assertEqual(articles[0].title, MOCK_HEADLINE['title'])
+        self.assertEqual(articles[0].url, MOCK_HEADLINE['link'])
+        self.assertEqual(articles[0].source_id, MOCK_HEADLINE['feed_id'])
+        self.assertEqual(articles[0].content, MOCK_HEADLINE['content'])
+        self.assertEqual(articles[0].source_title, MOCK_HEADLINE['feed_title'])
+        self.assertEqual(articles[0].id, str(MOCK_HEADLINE['id']))
         self.assertTrue(articles[0].fetch_content_from_url)
 
     def test_get_article_metadatas_logs(self):

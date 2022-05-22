@@ -1,11 +1,10 @@
+from typing import Optional
+
 """
 An ArticleMetadata should contain enough information for:
 - a CreateList module to order and filter a list of ArticleMetadata based on user-specified criteria
 - a FetchArticles module to fetch the article's contents and everything else needed to create the final file
 """
-from typing import Optional
-
-
 class ArticleMetadata:
     def __init__(self, title: str, url: str, source_id: str, content: str = "", source_title: str ="", article_id: str ="", fetch_content_from_url: bool = True):
         """
@@ -39,4 +38,10 @@ class ArticleMetadata:
         self.source_id = source_id
         self.title = title
         self.fetch_content_from_url = fetch_content_from_url
-        self.collector_id: Optional[int] = None # Can be set and used optionally by ListCreators
+        self.collector_id: Optional[str] = None
+
+    def set_collector_id(self, id: Optional[str]):
+        """
+        Allows Collectors or ListCreators to later store which Collector created this ArticleMetadata
+        """
+        self.collector_id = id

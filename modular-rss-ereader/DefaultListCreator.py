@@ -1,10 +1,10 @@
-from enum import Enum
-from typing import List, Optional, Callable, Dict
 from ArticleMetadata import ArticleMetadata
 from collector import Collector
+from enum import Enum
 from list_creator import ListCreator
 from list_creator import ListCreator
 import random
+from typing import List, Optional, Callable, Dict
 
 class ArticleOrder(Enum):
     """
@@ -86,9 +86,10 @@ class DefaultListCreator(ListCreator):
                 if self._should_include_article(article, total_per_source):
                     source_amount = total_per_source.get(article.source_id, 0)
                     total_per_source[article.source_id] = source_amount + 1
-                    article.collector_id = i
+                    article.set_collector_id(str(i))
                     chosen_articles.append(article)
             chosen_articles_by_collector[i] = chosen_articles
+            i += 1
         return chosen_articles_by_collector
     
     def _hit_max(self, num_articles) -> bool:
@@ -183,7 +184,7 @@ class DefaultListCreator(ListCreator):
         """
         i = 0
         for collector in self._collectors:
-            collector.used_articles_callback([a for a in articles if a.collector_id == i])
+            collector.used_articles_callback([a for a in articles if a.collector_id == str(i)])
             i += 1
 
     def get_article_metadatas(self) -> List[ArticleMetadata]:
@@ -201,4 +202,3 @@ class DefaultListCreator(ListCreator):
         if self._call_collector_callback:
             self.callback_collectors(articles)
         return articles
-

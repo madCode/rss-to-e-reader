@@ -5,11 +5,10 @@ A Collector does the following:
 
 For example, the TTRSSCollect module takes in a user's TinyTinyRSS feed and outputs a list of ArticleMetadata objects.
 """
-from typing import List, Callable, Optional
 from abc import abstractmethod
-
 from ArticleMetadata import ArticleMetadata
 from module import Module
+from typing import List, Callable, Optional
 
 class Collector(Module):
     def __init__(self, error_log_callback: Optional[Callable], info_log_callback: Optional[Callable]):

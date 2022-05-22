@@ -2,8 +2,8 @@ from ArticleMetadata import ArticleMetadata
 from collector import Collector
 import json
 import requests
-from typing import List, Dict, Optional, Union, Callable
 from ttrss_types import TtrssHeadline, TtrssResponse
+from typing import List, Dict, Optional, Union, Callable
 
 class TtrssCollector(Collector):
     """
@@ -137,8 +137,8 @@ class TtrssCollector(Collector):
         for headline in headlines:
             article = ArticleMetadata(
                 headline['title'], headline['link'],
-                headline['feed_title'], headline['content'],
-                headline['feed_id'], str(headline['id']),
+                headline['feed_id'], headline['content'],
+                headline['feed_title'], str(headline['id']),
                 fetch_content_from_url=(headline['feed_id'] in self._fetch_from_url_list)
                 )
             articles.append(article)
