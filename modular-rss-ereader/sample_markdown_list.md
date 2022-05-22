@@ -1,0 +1,4 @@
+- [ ] a_url_that_does_not_exist
+- [ ] https://en.wikipedia.org/wiki/Geology_of_the_Lassen_volcanic_area
+- [x] https://www.npr.org/sections/goatsandsoda/2022/05/21/1100363030/meet-the-cool-62-year-old-kenyan-on-first-all-black-team-to-summit-everest
+- [ ] https://www.nytimes.com/2022/05/20/world/americas/haiti-history-colonized-france.html

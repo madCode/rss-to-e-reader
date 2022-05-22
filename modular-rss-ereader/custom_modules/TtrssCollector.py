@@ -2,7 +2,7 @@ from base_classes.ArticleMetadata import ArticleMetadata
 from base_classes.collector import Collector
 import json
 import requests
-from ttrss_types import TtrssHeadline, TtrssResponse
+from custom_modules.ttrss_types import TtrssHeadline, TtrssResponse
 from typing import List, Dict, Optional, Union, Callable
 
 class TtrssCollector(Collector):

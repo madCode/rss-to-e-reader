@@ -1,8 +1,8 @@
 from base_classes.ArticleMetadata import ArticleMetadata
 from base_classes.collector import Collector
-from DefaultArticle import DefaultArticle
-from DefaultArticleFetcher import DefaultArticleFetcher
-from DefaultListCreator import ArticleOrder, DefaultListCreator
+from default_modules.DefaultArticle import DefaultArticle
+from default_modules.DefaultArticleFetcher import DefaultArticleFetcher
+from default_modules.DefaultListCreator import ArticleOrder, DefaultListCreator
 from enum import Enum
 from typing import Callable, List, Optional, Sequence
 
@@ -61,10 +61,10 @@ class FetchAndOrderList(DefaultListCreator, DefaultArticleFetcher):
             next_id = meta[i+1].id if i < len(meta) - 1 else meta[0].id
             if self._hit_max_time(current_time):
                 break
-            content, success = self._get_article_content(m)
+            content, title, success = self._get_article_content(m)
             if not success:
                 self.log_error(f"Failed to fetch article. Adding the following error message to document:\n{content}")
-            article = DefaultArticle(m, m.title[:DefaultArticleFetcher.TITLE_CUTOFF], content,next_id,self._wpm)
+            article = DefaultArticle(m, title[:DefaultArticleFetcher.TITLE_CUTOFF], content,next_id,self._wpm)
             result.append(article)
             current_time += article.time_to_read_in_minutes()
         # Rewrite the next_id on the last one to cycle back to the beginning
