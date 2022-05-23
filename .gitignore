@@ -3,5 +3,5 @@
 !.gitignore
 __pycache__
 
-personal_modifications
-personal_modifications/*
+personal
+personal/*

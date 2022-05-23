@@ -9,7 +9,7 @@ An FileCreator does the following:
 - takes in a file location and file name in the form of a filestub
 - creates a file based on those Article and maintains the order
 """
-class DefaultHTMLFileCreator(FileCreator):
+class HTMLFileCreator(FileCreator):
     def __init__(
         self, filestub: str, articles: Sequence[DefaultArticle], title: str, error_log_callback: Optional[Callable] = print, info_log_callback: Optional[Callable] = print):
         """

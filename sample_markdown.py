@@ -17,7 +17,7 @@ REMEMBER to reset the url statuses in sample_markdown_list.py if testing multipl
 from custom_modules.MarkdownCollector import MarkdownCollector
 from default_modules.DefaultListCreator import DefaultListCreator
 from default_modules.DefaultArticleFetcher import DefaultArticleFetcher
-from default_modules.DefaultHTMLFileCreator import DefaultHTMLFileCreator
+from custom_modules.HTMLFileCreator import HTMLFileCreator
 
 markdown_list_filepath = "sample_markdown_list.md" # Replace with your own list
 collector = MarkdownCollector(markdown_list_filepath) #1
@@ -25,7 +25,7 @@ list_creator = DefaultListCreator([collector]) #2
 metadata = list_creator.get_article_metadatas()
 article_fetcher = DefaultArticleFetcher(metadata) #3
 articles = article_fetcher.get_articles()
-file_creator = DefaultHTMLFileCreator("sample2", articles, "SAMPLE FILE") #4
+file_creator = HTMLFileCreator("sample2", articles, "SAMPLE FILE") #4
 file_creator.write_file() #5
 # optional: email the file to your kindle
 # default_send_email_kindle("to_email", "filestub", "email_user", "smtp_url", "smtp_port", "email_password")

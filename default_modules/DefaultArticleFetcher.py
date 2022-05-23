@@ -76,15 +76,11 @@ class DefaultArticleFetcher(ArticleFetcher):
             self.log_info("starting to get content")
             content = ''
             parser, is_default = self._get_parser(meta.url)
-            self.log_info("got parser")
             if len(meta.title) == 0:
                 titleElement = parser.find('title')
                 title = titleElement.string if titleElement else ''
-            self.log_info("got title")
             article = kindle_html_formatter.clean_for_kindle(parser)
-            self.log_info("clean for kindle")
             self.word_count = len(article.text.split())
-            self.log_info("got word count")
             content = '<p>[Default parser used]</p>' if is_default else ''
             if is_default:
                 if meta.source_id in self._replace_table_sources:
@@ -92,7 +88,6 @@ class DefaultArticleFetcher(ArticleFetcher):
                 else:
                     return (content + parser.get_text(), title, True)
             else:
-                self.log_info("gonna call article.prettify")
                 return (article.prettify(), title, True)
         except Exception as e:
             return (content + f'<p>Error: {str(e)}</p>', title, False)
