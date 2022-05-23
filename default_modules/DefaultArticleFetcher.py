@@ -1,8 +1,8 @@
 from base_classes.article_fetcher import ArticleFetcher
-import article_parser
+import default_modules.article_parser as article_parser
 from base_classes.ArticleMetadata import ArticleMetadata
-from DefaultArticle import DefaultArticle
-import kindle_html_formatter
+from default_modules.DefaultArticle import DefaultArticle
+import default_modules.kindle_html_formatter as kindle_html_formatter
 from typing import List, Callable, Optional, Any, Tuple, Sequence
 
 """
@@ -14,10 +14,17 @@ It truncates Article titles to 100 characters.
 class DefaultArticleFetcher(ArticleFetcher):
     TITLE_CUTOFF = 100
     def __init__(
-        self, meta: List[ArticleMetadata] = [], replace_table_source_ids: List[str] = [], error_log_callback: Optional[Callable] = print, info_log_callback: Optional[Callable] = print):
+        self, meta: List[ArticleMetadata], replace_table_source_ids: List[str] = [], error_log_callback: Optional[Callable] = print, info_log_callback: Optional[Callable] = print):
         """
         Parameters
         ----------
+        meta: List[ArticleMetadata]
+            The ordered collection of ArticleMetadata you want to produce articles for.
+        replace_table_source_ids: List[str], optional
+            Sometimes you want to replace <table> HTML elements with normal divs. This field allows you to pass in
+            source_ids for which you'd like that replacement to happen. Useful for newsletters that use tables for
+            email formatting. Because the table doesn't autoresize itself well in all eReaders, the tables become
+            impossible to read.
         error_log_callback: Optional[Callable], optional
         info_log_callback: Optional[Callable], optional
         """
@@ -42,12 +49,14 @@ class DefaultArticleFetcher(ArticleFetcher):
         for key in article_parser.special_parsers:
             if url.startswith(key):
                 parseFunction = article_parser.special_parsers[key]
+        parser = article_parser.get_bs4_parser(url)
         if parseFunction == None:
-            parseFunction = article_parser.get_bs4_parser(url)
             is_default = True
-        return parseFunction, is_default
+        else:
+            parser = parseFunction(parser)
+        return parser, is_default
 
-    def _get_article_content(self, meta: ArticleMetadata) -> Tuple[str, bool]:
+    def _get_article_content(self, meta: ArticleMetadata) -> Tuple[str, str, bool]:
         """
         Parameters
         ----------
@@ -56,26 +65,36 @@ class DefaultArticleFetcher(ArticleFetcher):
         
         Returns
         -------
-        A Tuple of the display content for the Article and a boolean to denote whether fetching the content was successful or not
+        A Tuple of the display content for the Article, the title of the Article, and a boolean to denote whether fetching the content was successful or not
         """
         if not meta.fetch_content_from_url:
-            return (meta.content, True)
+            return (meta.content, meta.title, True)
         
+        title = meta.title
         try:
+            self.log_info("starting to get content")
             content = ''
             parser, is_default = self._get_parser(meta.url)
+            self.log_info("got parser")
+            if len(meta.title) == 0:
+                titleElement = parser.find('title')
+                title = titleElement.string if titleElement else ''
+            self.log_info("got title")
             article = kindle_html_formatter.clean_for_kindle(parser)
+            self.log_info("clean for kindle")
             self.word_count = len(article.text.split())
+            self.log_info("got word count")
             content = '<p>[Default parser used]</p>' if is_default else ''
             if is_default:
                 if meta.source_id in self._replace_table_sources:
-                    return (content + article_parser.replace_tables_with_divs(parser.get_text()).prettify(), True)
+                    return (content + article_parser.replace_tables_with_divs(parser.get_text()).prettify(), title, True)
                 else:
-                    return (content + parser.get_text(), True)
+                    return (content + parser.get_text(), title, True)
             else:
-                return (article.prettify(), True)
+                self.log_info("gonna call article.prettify")
+                return (article.prettify(), title, True)
         except Exception as e:
-            return (content + f'<p>Error: {str(e)}</p>', False)
+            return (content + f'<p>Error: {str(e)}</p>', title, False)
 
     def _get_articles_given_meta(self, meta: List[ArticleMetadata]) -> List[DefaultArticle]:
         """
@@ -88,10 +107,10 @@ class DefaultArticleFetcher(ArticleFetcher):
         for i in range(len(meta)):
             m = meta[i]
             next_id = meta[i+1].id if i < len(meta) - 1 else 'top'
-            content, success = self._get_article_content(m)
+            content, title, success = self._get_article_content(m)
             if not success:
                 self.log_error(f"Failed to fetch article. Adding the following error message to document:\n{content}")
-            result.append(DefaultArticle(m, m.title[:DefaultArticleFetcher.TITLE_CUTOFF], content,next_id))
+            result.append(DefaultArticle(m, title[:DefaultArticleFetcher.TITLE_CUTOFF], content,next_id))
         return result
 
     def get_articles(self) -> Sequence[DefaultArticle]:

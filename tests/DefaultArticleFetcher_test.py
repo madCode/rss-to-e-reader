@@ -14,7 +14,7 @@ def create_response(content: str) -> requests.Response:
 class TestDefaultArticleFetcher(unittest.TestCase):
     def test_get_parser(self):
         # default is true
-        d = DefaultArticleFetcher()
+        d = DefaultArticleFetcher([])
         with patch.object(requests, 'get', return_value=create_response(MOCK_GOOGLE_RESPONSE_CONTENT)) as mock_method:
             _, b = d._get_parser('https://www.spectator.co.uk/')
         self.assertFalse(b)
@@ -25,7 +25,7 @@ class TestDefaultArticleFetcher(unittest.TestCase):
         self.assertTrue(b)
     
     def test_get_article_content(self):
-        d = DefaultArticleFetcher()
+        d = DefaultArticleFetcher([])
 
         # if fetch_content_from_url is false
         content, title, b = d._get_article_content(MOCK_ARTICLE_METADATA_DO_NOT_FETCH)
@@ -50,7 +50,7 @@ class TestDefaultArticleFetcher(unittest.TestCase):
         self.assertFalse(b)
 
     def test_get_articles_given_meta(self):
-        d = DefaultArticleFetcher()
+        d = DefaultArticleFetcher([])
 
         # if fetch_content_from_url is false
         articles = d._get_articles_given_meta([MOCK_ARTICLE_METADATA_DO_NOT_FETCH])

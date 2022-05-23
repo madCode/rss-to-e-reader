@@ -30,7 +30,7 @@ class MarkdownCollector(Collector):
         Parameters
         ----------
         list_filepath: str
-            Path to markdown file with list. The file should be in the following format:
+        Path to markdown file with list. Should include file extension. The file should be in the following format:
                 - [ ] url.com
                 - [x] url2.com
             The first url is considered "to do" and will be included in the result,
