@@ -1,5 +1,5 @@
-# RSS-to-e-Reader
-RSS-to-e-Reader is a modular open source python library that allows you to send articles to your eReader with the push of a button.
+# Article-to-e-Reader
+Article-to-e-Reader is a modular open source python library that allows you to send articles to your eReader with the push of a button.
 
 ## Supported Inputs
 - TinyTinyRSS: the TtrssCollector allows pulling articles directly from your TinyTinyRSS reader.
