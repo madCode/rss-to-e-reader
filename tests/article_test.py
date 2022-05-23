@@ -32,5 +32,5 @@ class TestArticle(unittest.TestCase):
 
             She pointed vaguely into the darkness, and I followed her gesture with my eyes.  But I could see no sign of house or light or living creature—only the darkness and, in the fore-ground, the blurred outlines of masses of rock.
         """
-        A = Article(ArticleMetadata("","",""),display_content=a)
+        A = Article(ArticleMetadata("","",""),additional_content=a)
         self.assertEqual(A.word_count,404)

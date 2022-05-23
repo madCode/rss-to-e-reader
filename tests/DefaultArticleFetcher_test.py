@@ -29,7 +29,7 @@ class TestDefaultArticleFetcher(unittest.TestCase):
 
         # if fetch_content_from_url is false
         content, title, b = d._get_article_content(MOCK_ARTICLE_METADATA_DO_NOT_FETCH)
-        self.assertEqual(content, "CONTENTS")
+        self.assertEqual(content, "")
         self.assertEqual(title, "THIS IS THE TITLE")
         self.assertTrue(b)
 
