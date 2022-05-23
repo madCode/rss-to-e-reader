@@ -1,6 +1,6 @@
 import unittest
 import unittest.mock as mock
-from custom_modules.FetchThenOrderList import FetchAndOrderList, MaxType
+from custom_modules.FetchThenOrderList import FetchThenOrderList, MaxType
 
 from custom_modules.TtrssCollector import TtrssCollector
 from TtrssCollector_mocks import MOCK_HEADLINE, MOCK_HEADLINE_2
@@ -8,7 +8,7 @@ from TtrssCollector_mocks import MOCK_HEADLINE, MOCK_HEADLINE_2
 class TestFetchThenOrderList(unittest.TestCase):
 
     def test_get_article_metadatas(self):
-        f = FetchAndOrderList([])
+        f = FetchThenOrderList([])
         self.assertRaises(NotImplementedError,f.get_article_metadatas)
 
     def test_get_articles_max_num_articles(self):
@@ -33,19 +33,19 @@ class TestFetchThenOrderList(unittest.TestCase):
         inst2._logout = mock.MagicMock()
 
         # gets only the number of articles
-        f = FetchAndOrderList([inst, inst2],max_val=1)
+        f = FetchThenOrderList([inst, inst2],max_val=1)
         articles = f._get_articles_max_num_articles()
         self.assertEqual(len(articles),1)
         self.assertEqual(articles[0].display_title,MOCK_HEADLINE['title'])
 
     def test_hit_max_time(self):
         # when max_time is less than 0, return False
-        f = FetchAndOrderList([],max_type=MaxType.TIME_IN_MINUTES)
+        f = FetchThenOrderList([],max_type=MaxType.TIME_IN_MINUTES)
         self.assertFalse(f._hit_max_time(100000000000000000000000000000000000000000))
 
         # otherwise returns whether curr_time is greater
         #   than or equal to max_time
-        f = FetchAndOrderList([],max_type=MaxType.TIME_IN_MINUTES,max_val=50)
+        f = FetchThenOrderList([],max_type=MaxType.TIME_IN_MINUTES,max_val=50)
         self.assertTrue(f._hit_max_time(51))
 
     def test_get_articles_max_time(self):
@@ -102,20 +102,20 @@ class TestFetchThenOrderList(unittest.TestCase):
         inst2._logout = mock.MagicMock()
 
         # return all articles when max_val is -1
-        f = FetchAndOrderList([inst, inst2],max_type=MaxType.TIME_IN_MINUTES,reading_speed_wpm=5)
+        f = FetchThenOrderList([inst, inst2],max_type=MaxType.TIME_IN_MINUTES,reading_speed_wpm=5)
         articles = f._get_articles_max_time()
         self.assertEqual(len(articles),2)
         self.assertEqual(articles[0].display_title,MOCK_HEADLINE['title'])
         self.assertEqual(articles[1].display_title,MOCK_HEADLINE_2['title'])
 
         # return some articles when max_val is few minues
-        f = FetchAndOrderList([inst, inst2],max_type=MaxType.TIME_IN_MINUTES,max_val=1,reading_speed_wpm=5)
+        f = FetchThenOrderList([inst, inst2],max_type=MaxType.TIME_IN_MINUTES,max_val=1,reading_speed_wpm=5)
         articles = f._get_articles_max_time()
         self.assertEqual(len(articles),1)
         self.assertEqual(articles[0].display_title,MOCK_HEADLINE['title'])
 
     def test_get_articles(self):
-        f = FetchAndOrderList([])
+        f = FetchThenOrderList([])
         f._get_articles_max_time = mock.MagicMock()
         f._get_articles_max_num_articles = mock.MagicMock()
 

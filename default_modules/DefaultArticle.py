@@ -23,6 +23,7 @@ class DefaultArticle(Article):
             Pass in -1 to not use wpm in rendering.
         """
         super().__init__(meta, display_title, display_content)
+        self.id = meta.id
         self.next_id = next_id
         self._wpm = wpm
 

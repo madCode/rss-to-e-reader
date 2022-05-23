@@ -145,7 +145,7 @@ class TtrssCollector(Collector):
                 fetch_content_from_url=(headline['feed_id'] in self._fetch_from_url_list)
                 )
             articles.append(article)
-            if self._info_log_callback and i%10 == 0:
+            if i%10 == 0:
                 self.log_info(f'loading article from ttrss {i}/{total}')
             i+=1
         return articles

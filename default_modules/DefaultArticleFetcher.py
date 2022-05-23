@@ -68,7 +68,8 @@ class DefaultArticleFetcher(ArticleFetcher):
         A Tuple of the display content for the Article, the title of the Article, and a boolean to denote whether fetching the content was successful or not
         """
         if not meta.fetch_content_from_url:
-            return (meta.content, meta.title, True)
+            self.log_info(f"Not fetching content from url for article {meta.title}")
+            return ('', meta.title, True)
         
         title = meta.title
         try:
@@ -109,7 +110,7 @@ class DefaultArticleFetcher(ArticleFetcher):
             next_id = meta[i+1].id if i < len(meta) - 1 else 'top'
             content, title, success = self._get_article_content(m)
             if not success:
-                self.log_error(f"Failed to fetch article. Adding the following error message to document:\n{content}")
+                self.log_error(f"Failed to fetch article {title}. Adding the following error message to document:\n{content}")
             result.append(DefaultArticle(m, title[:DefaultArticleFetcher.TITLE_CUTOFF], content,next_id))
         return result
 

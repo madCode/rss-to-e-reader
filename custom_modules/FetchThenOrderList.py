@@ -19,7 +19,7 @@ FetchAndOrderList is a custom ListCreator _and_ ArticleFetcher that inherits fro
 By combining the functions of filtering the list _and_ fetching the articles, this module allows users to specify a max read time
 for their final output.
 """
-class FetchAndOrderList(DefaultListCreator, DefaultArticleFetcher):
+class FetchThenOrderList(DefaultListCreator, DefaultArticleFetcher):
     def __init__(
         self, collectors: List[Collector], article_order: ArticleOrder = ArticleOrder.ZIP_COLLECTORS,
         max_type: MaxType = MaxType.NUM_ARTICLES, max_per_source_id: int = -1,
