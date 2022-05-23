@@ -1,4 +1,4 @@
-name: Python: run mypy and unittests
+name: Python- Type checking and Testing
 
 on: [push]
 
