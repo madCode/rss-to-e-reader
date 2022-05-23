@@ -50,7 +50,7 @@ class DefaultArticleFetcher(ArticleFetcher):
             if url.startswith(key):
                 parseFunction = article_parser.special_parsers[key]
         parser = article_parser.get_bs4_parser(url)
-        if parseFunction == None:
+        if parseFunction is None:
             is_default = True
         else:
             parser = parseFunction(parser)
