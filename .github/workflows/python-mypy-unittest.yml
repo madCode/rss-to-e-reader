@@ -19,7 +19,7 @@ jobs:
         run: python -m pip install bs4
       - run: python -m pip install unidecode
       - run: python -m pip install mypy
-      - run: mypy --install-types
+      - run: python -m pip install types-requests
       - name: Run mypy
         run: mypy .
       - name: Run unittests
