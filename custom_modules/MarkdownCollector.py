@@ -2,8 +2,8 @@ from enum import Enum
 from base_classes.ArticleMetadata import ArticleMetadata
 from base_classes.collector import Collector
 from typing import Dict, List, Callable, Optional, TypedDict, Union
+import hashlib
 import re
-import random
 
 class ListItemStatus(Enum):
     TO_DO = "TO_DO"
@@ -94,7 +94,7 @@ class MarkdownCollector(Collector):
         while article == None and len(self._to_do) > 0:
             url = self._to_do.pop(0)
             try:
-                article = ArticleMetadata('', url, source_id="0", source_title='List of Articles To Read', article_id=str(random.randint(1,6000)))
+                article = ArticleMetadata('', url, source_id="0", source_title='List of Articles To Read', article_id=hashlib.sha1(url.encode('utf-8')).hexdigest()[:12])
             except Exception as e:
                 self.log_error("Error fetching article: ")
                 print(e)
