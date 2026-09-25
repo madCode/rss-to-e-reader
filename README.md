@@ -6,7 +6,8 @@ Article-to-e-Reader is a modular open source python library that allows you to s
 - list of urls: the MarkdownListCollector allows pulling articles from a markdown list of your choosing
 
 ## Supported Outputs
-- html: the DefaultHTMLFileCreator allows the creation of HTML files in a location of your choosing. For example, a Dropbox folder shared with your eReader.
+- epub (recommended): the EpubFileCreator creates an e-book with a cover, a contents page, one chapter per article and the articles' images embedded. EPUB is the format Amazon recommends for Send to Kindle, and Kobo, KOReader, Apple Books and Calibre all read it natively.
+- html: the HTMLFileCreator creates a single HTML file in a location of your choosing.
 - email_api: the email_api.py file contains functions allowing you to email any file to your eReader.
 
 ## How articles are extracted
@@ -17,11 +18,14 @@ DefaultArticleFetcher downloads each article (several at a time) and runs an ext
 
 The result is then cleaned up for e-readers (`default_modules/kindle_html_formatter.py`): only simple, semantic tags are kept, lazy-loaded images and relative links are fixed, share buttons/newsletter sign-ups/related-article lists are removed, and layout tables (common in email newsletters) are flattened. If a page can't be fetched (paywalls, bot blocking), the content from your RSS feed is used instead, with a note saying so.
 
+To see how well a page extracts, run `python3 sample_urls_to_epub.py <url> [<url> ...] -o test` and open `test.epub`.
+
 ## Basic Usage
 1. Clone or download this repo into a folder in your system. Nagivate to that folder in your terminal.
 2. Install python3 if it's not already on your system.
 3. Install the dependencies with `pip install -r requirements.txt`. This library relies on:
     - [trafilatura](https://trafilatura.readthedocs.io) and [readability-lxml](https://github.com/buriy/python-readability) to find the article in a web page, and [BeautifulSoup4](https://beautiful-soup-4.readthedocs.io/en/latest/) to clean it up.
+    - [EbookLib](https://github.com/aerkalov/ebooklib) and [Pillow](https://python-pillow.org) to build EPUB files and shrink images for e-readers.
     - mypy for static type checking (not necessary unless you're building custom modules)
 4. To see basic usage, take a look at the examples folder. The sample_ttrss.py and the sample_markdown.py files show two different approaches. In either file, in the marked variables and run from your terminal as outlined in the comments at the top of the selected file. 
 
@@ -42,7 +46,7 @@ The examples folder contains samples of how to hook the modules together. They f
 1. create the Collectors first, pass as many Collectors as needed into the ListCreator.
 2. Use the ListCreator's `get_article_metadatas` function to generate a list of ArticleMetadata.
 3. Pass that into your ArticleFetcher and call `get_articles` to generate your list of Articles.
-4. Pass the list of Articles into your FileCreator and call `write_file` to generate the file.
+4. Pass the list of Articles into your FileCreator and call `write_file` to generate the file. It returns the file's path.
 5. If you wish to email the file, pass the filestub into the `default_send_file_in_email` function provided in `email_api.py`.
 
 ### Help grow the library!
