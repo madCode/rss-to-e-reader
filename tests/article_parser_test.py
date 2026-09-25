@@ -22,6 +22,20 @@ class TestArticleParser(unittest.TestCase):
         self.assertGreater(article.word_count, 200)
         self.assertNotIn('Comments (212)', article.html)
 
+    def test_cookie_banners_and_dialogs_are_removed_before_extraction(self):
+        banner = ('<div id="cmplz-cookiebanner-container"><div class="cmplz-cookiebanner" role="dialog">'
+                  '<p>The technical storage or access is strictly necessary for the legitimate purpose.</p>'
+                  '<p>Statistics</p><p>Marketing</p></div></div>'
+                  '<div aria-modal="true"><p>Subscribe to our newsletter for more great content today.</p></div>')
+        article = extract_article(FIXTURE.replace('</main>', '</main>' + banner), 'https://example.com/culture/slow')
+        self.assertIn('particular pleasure in reading slowly', article.html)
+        self.assertNotIn('technical storage', article.html)
+        self.assertNotIn('Subscribe to our newsletter', article.html)
+
+    def test_overlay_markers_never_remove_most_of_the_page(self):
+        html = f'<html><body><div class="cookie-recipes"><p>{LONG_TEXT}</p></div><p>footer</p></body></html>'
+        self.assertGreater(extract_article(html, 'https://example.com/recipes').word_count, 250)
+
     def test_site_rule_wins_when_it_finds_enough_text(self):
         html = f'<html><body><section name="articleBody"><p>{LONG_TEXT}</p></section><div>other</div></body></html>'
         article = extract_article(html, 'https://www.nytimes.com/2024/01/01/story.html')
