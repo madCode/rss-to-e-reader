@@ -12,6 +12,7 @@ from typing import Dict, List, Optional, Set, Tuple
 from urllib.parse import urljoin, urlparse
 
 from bs4 import BeautifulSoup, Comment, NavigableString, Tag  # type: ignore
+from requests.utils import requote_uri
 
 from base_classes.article import count_words  # noqa: F401 (re-exported)
 
@@ -70,7 +71,8 @@ PREFERRED_IMAGE_WIDTH = 1000
 LAYOUT_TABLE_CELL_WORDS = 80
 _HTML_TAG_PATTERN = re.compile(r'<\s*[a-zA-Z!/]')
 _WHITESPACE = re.compile(r'\s+')
-_INVALID_URL_CHARACTERS = re.compile(r'[\s"\\<>`{}|^]')
+# Characters that mean the "url" is really mangled markup, not something worth percent-encoding.
+_MANGLED_URL_CHARACTERS = re.compile(r'["\\<>]')
 
 
 def attr(element: Tag, name: str) -> str:
@@ -272,6 +274,21 @@ def _fix_pictures(soup: BeautifulSoup):
         picture.replace_with(img)
 
 
+def _normalize_url(url: str) -> Optional[str]:
+    """
+    Percent-encodes characters urls can't contain (spaces, a second '#', ...), which EPUB validators and Send to
+    Kindle reject. Returns None for strings that are mangled markup rather than urls.
+    """
+    url = url.strip()
+    if not url or _MANGLED_URL_CHARACTERS.search(url):
+        return None
+    before, hash_sign, fragment = url.partition('#')
+    try:
+        return requote_uri(before + hash_sign + fragment.replace('#', '%23'))
+    except ValueError:
+        return None
+
+
 def _fix_images(soup: BeautifulSoup, base_url: str, keep_images: bool):
     for img in soup.find_all('img'):
         if not keep_images:
@@ -285,10 +302,11 @@ def _fix_images(soup: BeautifulSoup, base_url: str, keep_images: bool):
             img.decompose()
             continue
         if not src.startswith('data:'):
-            src = urljoin(base_url, src) if base_url else src
-            if _INVALID_URL_CHARACTERS.search(src) or urlparse(src).scheme not in ('http', 'https', ''):
+            normalized = _normalize_url(urljoin(base_url, src) if base_url else src)
+            if normalized is None or urlparse(normalized).scheme not in ('http', 'https', ''):
                 img.decompose()
                 continue
+            src = normalized
         img.attrs = {'src': src, 'alt': attr(img, 'alt').strip()}
 
 
@@ -348,8 +366,8 @@ def _fix_links(soup: BeautifulSoup, base_url: str, keep_links: bool, id_prefix: 
             else:
                 link['href'] = '#' + target
             continue
-        absolute = urljoin(base_url, href) if base_url else href
-        if _INVALID_URL_CHARACTERS.search(absolute) or urlparse(absolute).scheme not in ('http', 'https', 'mailto'):
+        absolute = _normalize_url(urljoin(base_url, href) if base_url else href)
+        if absolute is None or urlparse(absolute).scheme not in ('http', 'https', 'mailto'):
             link.unwrap()
             continue
         link['href'] = absolute
