@@ -80,6 +80,7 @@ class TestArticleParser(unittest.TestCase):
         self.assertEqual(clean_title('E-reader - Wikipedia', 'Wikimedia Foundation', 'https://en.wikipedia.org/wiki/E-reader'), 'E-reader')
         self.assertEqual(clean_title('An essay | Aeon Essays', 'Aeonmag', 'https://aeon.co/essays/x'), 'An essay')
         self.assertEqual(clean_title('Life - a story - The Atlantic', 'The Atlantic', ''), 'Life - a story')
+        self.assertEqual(clean_title('It’s a World | Zoë Hu', 'The Baffler', 'https://thebaffler.com/x', 'Zoë Hu'), 'It’s a World')
         # separators that aren't followed by the site name stay
         self.assertEqual(clean_title('Review: a book - worth it', 'Example', 'https://example.org/'), 'Review: a book - worth it')
 

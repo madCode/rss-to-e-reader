@@ -1,5 +1,6 @@
 from base_classes.article_fetcher import ArticleFetcher
 import default_modules.article_parser as article_parser
+from default_modules.browser_impersonation import DEFAULT_IMPERSONATE
 from base_classes.ArticleMetadata import ArticleMetadata
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
@@ -36,7 +37,7 @@ class DefaultArticleFetcher(ArticleFetcher):
         self, meta: List[ArticleMetadata], replace_table_source_ids: List[str] = [],
         error_log_callback: Optional[Callable] = print, info_log_callback: Optional[Callable] = print,
         keep_images: bool = True, timeout: float = article_parser.DEFAULT_TIMEOUT, max_workers: int = 4,
-        session: Optional[requests.Session] = None):
+        session: Optional[requests.Session] = None, impersonate_browser: Optional[str] = DEFAULT_IMPERSONATE):
         """
         Parameters
         ----------
@@ -56,6 +57,9 @@ class DefaultArticleFetcher(ArticleFetcher):
             How many articles to fetch at the same time. Defaults to 4. Use 1 to fetch one at a time.
         session: requests.Session, optional
             Session to fetch with, e.g. one carrying cookies for sites you subscribe to.
+        impersonate_browser: str, optional
+            When a site blocks the request as a bot, retry looking like this browser: 'chrome' (the default),
+            'safari', 'firefox', 'edge'... Needs the curl_cffi package. Pass None to turn this off.
         """
         super().__init__(error_log_callback, info_log_callback)
         self._replace_table_sources = replace_table_source_ids
@@ -64,6 +68,7 @@ class DefaultArticleFetcher(ArticleFetcher):
         self._timeout = timeout
         self._max_workers = max(1, max_workers)
         self._session = session
+        self._impersonate = impersonate_browser
 
     @staticmethod
     def _ensure_id(meta: ArticleMetadata):
@@ -79,7 +84,7 @@ class DefaultArticleFetcher(ArticleFetcher):
         )
 
     def _fetch_page(self, url: str) -> str:
-        return article_parser.fetch_html(url, timeout=self._timeout, session=self._session)[0]
+        return article_parser.fetch_html(url, timeout=self._timeout, session=self._session, impersonate=self._impersonate)[0]
 
     def _get_article_content(self, meta: ArticleMetadata) -> FetchResult:
         """
@@ -104,7 +109,8 @@ class DefaultArticleFetcher(ArticleFetcher):
         title = meta.title
         try:
             self.log_info(f"Fetching {meta.url}")
-            html, final_url = article_parser.fetch_html(meta.url, timeout=self._timeout, session=self._session)
+            html, final_url = article_parser.fetch_html(
+                meta.url, timeout=self._timeout, session=self._session, impersonate=self._impersonate)
             with DefaultArticleFetcher._PARSE_LOCK:
                 extracted = article_parser.extract_article(html, final_url, fetch=self._fetch_page)
                 title = meta.title or extracted.title or article_parser.title_from_url(meta.url)
