@@ -9,11 +9,19 @@ Article-to-e-Reader is a modular open source python library that allows you to s
 - html: the DefaultHTMLFileCreator allows the creation of HTML files in a location of your choosing. For example, a Dropbox folder shared with your eReader.
 - email_api: the email_api.py file contains functions allowing you to email any file to your eReader.
 
+## How articles are extracted
+DefaultArticleFetcher downloads each article (several at a time) and runs an extraction pipeline (`default_modules/article_parser.py`):
+1. a site-specific rule, if one exists for the site (`SITE_RULES`);
+2. [trafilatura](https://trafilatura.readthedocs.io) and [readability](https://github.com/buriy/python-readability) (the algorithm behind Firefox's Reader View). Trafilatura's output is cleaner, so it's preferred unless readability finds a lot more text;
+3. the schema.org `articleBody` many sites embed for search engines.
+
+The result is then cleaned up for e-readers (`default_modules/kindle_html_formatter.py`): only simple, semantic tags are kept, lazy-loaded images and relative links are fixed, share buttons/newsletter sign-ups/related-article lists are removed, and layout tables (common in email newsletters) are flattened. If a page can't be fetched (paywalls, bot blocking), the content from your RSS feed is used instead, with a note saying so.
+
 ## Basic Usage
 1. Clone or download this repo into a folder in your system. Nagivate to that folder in your terminal.
 2. Install python3 if it's not already on your system.
-3. Check for any missing dependencies by running `pip check`. This library relies on:
-    - [BeautifulSoup4](https://beautiful-soup-4.readthedocs.io/en/latest/) to fetch the article contents from the internet and format them.
+3. Install the dependencies with `pip install -r requirements.txt`. This library relies on:
+    - [trafilatura](https://trafilatura.readthedocs.io) and [readability-lxml](https://github.com/buriy/python-readability) to find the article in a web page, and [BeautifulSoup4](https://beautiful-soup-4.readthedocs.io/en/latest/) to clean it up.
     - mypy for static type checking (not necessary unless you're building custom modules)
 4. To see basic usage, take a look at the examples folder. The sample_ttrss.py and the sample_markdown.py files show two different approaches. In either file, in the marked variables and run from your terminal as outlined in the comments at the top of the selected file. 
 
