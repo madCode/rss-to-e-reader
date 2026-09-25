@@ -1,5 +1,12 @@
 from abc import abstractmethod
 from base_classes.ArticleMetadata import ArticleMetadata
+import re
+
+def count_words(content: str) -> int:
+    """Counts the words of visible text, ignoring any HTML tags."""
+    text = re.sub(r'<(script|style)[^>]*>.*?</\1>', ' ', content, flags=re.S | re.I)
+    text = re.sub(r'<[^>]+>', ' ', text)
+    return len(text.split())
 
 """
 An Article contains enough information for the article to be rendered anywhere.
@@ -21,7 +28,7 @@ class Article():
         self.display_title = display_title if len(display_title) > 0 else meta.title
         self.display_content = additional_content if len(additional_content) > 0 else meta.content
         self.used_meta_content = True if len(additional_content) <= 0 else False
-        self.word_count = len(self.display_content.split())
+        self.word_count = count_words(self.display_content)
     
     @abstractmethod
     def to_html_string(self) -> str:
