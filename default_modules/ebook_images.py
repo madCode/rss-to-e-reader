@@ -16,6 +16,7 @@ from PIL import Image  # type: ignore
 import requests
 
 from default_modules.article_parser import DEFAULT_HEADERS
+from default_modules.browser_impersonation import BLOCKED_STATUS_CODES, impersonated_get
 
 MAX_DOWNLOAD_BYTES = 15 * 1024 * 1024
 MIN_DIMENSION = 48  # smaller images are icons, avatars and spacers
@@ -63,7 +64,11 @@ def _data_uri_bytes(uri: str) -> Optional[bytes]:
         return None
 
 
-def download_image(url: str, referer: str = '', timeout: float = 20, session: Optional[requests.Session] = None) -> Optional[bytes]:
+def download_image(
+    url: str, referer: str = '', timeout: float = 20, session: Optional[requests.Session] = None,
+    impersonate: Optional[str] = None,
+) -> Optional[bytes]:
+    """The image's bytes, or None. Blocked downloads are retried impersonating the `impersonate` browser, if given."""
     if url.startswith('data:'):
         return _data_uri_bytes(url)
     if url.lower().split('?')[0].endswith('.svg'):
@@ -75,6 +80,10 @@ def download_image(url: str, referer: str = '', timeout: float = 20, session: Op
     getter = session.get if session is not None else requests.get
     try:
         response = getter(url, headers=headers, timeout=timeout, stream=True)
+        if impersonate and response.status_code in BLOCKED_STATUS_CODES:
+            retry = impersonated_get(url, impersonate, timeout, session, referer)
+            if retry is not None and retry.status_code < 400 and len(retry.content) <= MAX_DOWNLOAD_BYTES:
+                return retry.content
         response.raise_for_status()
         chunks = []
         size = 0
@@ -91,12 +100,13 @@ def download_image(url: str, referer: str = '', timeout: float = 20, session: Op
 def fetch_images(
     urls: Iterable[str], referer: str = '', max_dimension: int = 1200, grayscale: bool = False,
     quality: int = 80, timeout: float = 20, max_workers: int = 6, session: Optional[requests.Session] = None,
+    impersonate: Optional[str] = None,
 ) -> Dict[str, ProcessedImage]:
     """Downloads and processes images in parallel. Images that fail are left out of the result."""
     unique = list(dict.fromkeys(urls))
 
     def work(url: str) -> Optional[ProcessedImage]:
-        data = download_image(url, referer, timeout, session)
+        data = download_image(url, referer, timeout, session, impersonate)
         return process_image(data, max_dimension, grayscale, quality) if data else None
 
     with ThreadPoolExecutor(max_workers=max(1, max_workers)) as executor:
