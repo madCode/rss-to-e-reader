@@ -24,7 +24,7 @@ import requests
 import trafilatura  # type: ignore
 from readability import Document  # type: ignore
 
-from default_modules.kindle_html_formatter import count_words, text_to_html
+from default_modules.kindle_html_formatter import attr, count_words, text_to_html
 
 USER_AGENT = (
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) '
@@ -37,6 +37,8 @@ DEFAULT_HEADERS = {
 }
 DEFAULT_TIMEOUT = 20
 MIN_WORDS = 150
+# class/id substrings of cookie and consent banners (including common consent-management plugins).
+OVERLAY_MARKERS = ('cookie', 'consent', 'gdpr', 'cmplz', 'onetrust', 'didomi', 'usercentrics', 'truste')
 READABILITY_PREFERENCE_RATIO = 1.5
 TITLE_SEPARATORS = re.compile(r'\s+[|\-\u2013\u2014:\u00b7\u2022]\s+')
 
@@ -167,6 +169,29 @@ def _body(soup: BeautifulSoup) -> Optional[str]:
     return str(body)
 
 
+def remove_overlays(soup: BeautifulSoup) -> bool:
+    """
+    Removes cookie/consent banners and modal dialogs from the page. They have to go before extraction:
+    trafilatura drops attributes, so their text would otherwise reach the sanitizer looking like ordinary
+    paragraphs. Returns whether anything was removed.
+    """
+    total_words = len(soup.get_text(' ').split()) or 1
+    removed = False
+    for element in soup.find_all(True):
+        if element.decomposed or element.name in ('html', 'head', 'body'):
+            continue
+        marks = f"{attr(element, 'class')} {attr(element, 'id')}".lower()
+        is_overlay = (
+            element.name == 'dialog' or attr(element, 'role') in ('dialog', 'alertdialog')
+            or attr(element, 'aria-modal') == 'true' or any(marker in marks for marker in OVERLAY_MARKERS)
+        )
+        # Safety net, as in clean_html: never remove most of the page because of an unlucky class name.
+        if is_overlay and len(element.get_text(' ').split()) / total_words < 0.4:
+            element.decompose()
+            removed = True
+    return removed
+
+
 # --- Metadata ----------------------------------------------------------------------------------------
 
 def clean_title(title: str, site_name: str = '', url: str = '') -> str:
@@ -242,6 +267,8 @@ def extract_article(
     if not meta.get('title'):
         title_tag = soup.find('title')
         meta['title'] = clean_title(title_tag.get_text() if title_tag else '', url=url)
+    if remove_overlays(soup):
+        html = str(soup)
 
     def run(name: str, stage: Callable[[], Optional[str]]) -> Optional[ExtractedArticle]:
         try:
