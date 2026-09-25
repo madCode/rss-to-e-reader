@@ -35,6 +35,14 @@ class TestCleanHtml(unittest.TestCase):
         cleaned = clean_html('<p><a href=\'\\"http:/x\\"\'>bad</a></p>', BASE)
         self.assertEqual(cleaned, '<p>bad</p>')
 
+    def test_encodes_invalid_url_characters(self):
+        html = '<p><a href="https://a.com/x y#one#two">a</a> <a href="/p?q={1}|2">b</a></p><img src="/i m g.jpg"/>'
+        self.assertEqual(clean_html(html, BASE),
+                         '<p><a href="https://a.com/x%20y#one%23two">a</a> <a href="https://example.com/p?q=%7B1%7D%7C2">b</a></p>'
+                         '<img alt="" src="https://example.com/i%20m%20g.jpg"/>')
+        # already-encoded urls are left alone
+        self.assertEqual(clean_html('<a href="https://a.com/a%20b">x</a>'), '<a href="https://a.com/a%20b">x</a>')
+
     def test_keep_links_false(self):
         self.assertEqual(clean_html('<p><a href="/x">text</a></p>', BASE, keep_links=False), '<p>text</p>')
 
