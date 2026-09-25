@@ -1,3 +1,4 @@
+import hashlib
 import os
 import tempfile
 import unittest
@@ -50,6 +51,13 @@ class TestMarkdownCollector(unittest.TestCase):
         self.assertEqual({m.source_title for m in metas}, {'List of Articles To Read'})
         self.assertTrue(all(m.fetch_content_from_url and m.id for m in metas))
         self.assertEqual(len(c), 0)
+
+    def test_ids_are_stable_and_unique(self):
+        first = [m.id for m in self.collector().get_article_metadatas()]
+        second = [m.id for m in self.collector().get_article_metadatas()]
+        self.assertEqual(first, second)
+        self.assertEqual(len(set(first)), len(first))
+        self.assertEqual(first[0], hashlib.sha1(b'https://example.com/one').hexdigest()[:12])
 
     def test_add(self):
         c = self.collector()
