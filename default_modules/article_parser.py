@@ -24,6 +24,7 @@ import requests
 import trafilatura  # type: ignore
 from readability import Document  # type: ignore
 
+from default_modules.browser_impersonation import DEFAULT_IMPERSONATE, impersonated_get, looks_blocked
 from default_modules.kindle_html_formatter import attr, count_words, text_to_html
 
 USER_AGENT = (
@@ -57,9 +58,13 @@ class ExtractedArticle:
         return count_words(self.html)
 
 
-def fetch_html(url: str, timeout: float = DEFAULT_TIMEOUT, session: Optional[requests.Session] = None) -> Tuple[str, str]:
+def fetch_html(
+    url: str, timeout: float = DEFAULT_TIMEOUT, session: Optional[requests.Session] = None,
+    impersonate: Optional[str] = DEFAULT_IMPERSONATE,
+) -> Tuple[str, str]:
     """
-    Downloads a page.
+    Downloads a page. If the site turns the request away as a bot (see browser_impersonation), it is retried
+    impersonating the `impersonate` browser. Pass impersonate=None to never retry.
 
     Returns
     -------
@@ -67,12 +72,19 @@ def fetch_html(url: str, timeout: float = DEFAULT_TIMEOUT, session: Optional[req
     Raises requests.HTTPError for 4xx/5xx responses.
     """
     getter = session.get if session is not None else requests.get
-    response = getter(url, headers=DEFAULT_HEADERS, timeout=timeout)
-    response.raise_for_status()
-    return decode_response(response), response.url or url
+    response: Any = getter(url, headers=DEFAULT_HEADERS, timeout=timeout)
+    if impersonate and looks_blocked(response):
+        retry = impersonated_get(url, impersonate, timeout, session)
+        # Only a successful retry replaces the original response, so failures report the original error.
+        if retry is not None and retry.status_code < 400 and not looks_blocked(retry):
+            response = retry
+    if isinstance(response, requests.Response):
+        response.raise_for_status()
+    return decode_response(response), str(response.url or url)
 
 
-def decode_response(response: requests.Response) -> str:
+def decode_response(response: Any) -> str:
+    """Decodes a requests (or curl_cffi) response's body."""
     content_type = response.headers.get('content-type', '').lower()
     if 'charset=' in content_type and response.encoding:
         try:
@@ -194,8 +206,8 @@ def remove_overlays(soup: BeautifulSoup) -> bool:
 
 # --- Metadata ----------------------------------------------------------------------------------------
 
-def clean_title(title: str, site_name: str = '', url: str = '') -> str:
-    """Removes a trailing site name, e.g. 'E-reader - Wikipedia' -> 'E-reader'."""
+def clean_title(title: str, site_name: str = '', url: str = '', author: str = '') -> str:
+    """Removes a trailing site or author name, e.g. 'E-reader - Wikipedia' -> 'E-reader'."""
     title = re.sub(r'\s+', ' ', title or '').strip()
     parts = TITLE_SEPARATORS.split(title)
     if len(parts) < 2:
@@ -204,8 +216,10 @@ def clean_title(title: str, site_name: str = '', url: str = '') -> str:
     host = (urlparse(url).hostname or '').lower()
     host_words = [w for w in re.split(r'[.\-]', host) if w not in ('www', 'com', 'org', 'net', 'co', 'uk', '')]
     site = re.sub(r'[^a-z0-9]', '', site_name.lower())
+    author_key = re.sub(r'[^a-z0-9]', '', author.lower())
     matches_site = bool(suffix) and (
         (site and (site in suffix or suffix in site)) or any(w in suffix for w in host_words if len(w) > 2)
+        or (len(author_key) > 3 and (author_key in suffix or suffix in author_key))
     )
     if matches_site and len(parts[-1].split()) <= 5:
         last_separator = list(TITLE_SEPARATORS.finditer(title))[-1]
@@ -239,7 +253,7 @@ def _metadata(html: str, url: str) -> Dict[str, str]:
     if meta is None:
         return {}
     return {
-        'title': clean_title(meta.title or '', meta.sitename or '', url),
+        'title': clean_title(meta.title or '', meta.sitename or '', url, meta.author or ''),
         'author': _clean_author(meta.author or ''),
         'date': meta.date or '',
         'site_name': meta.sitename or '',

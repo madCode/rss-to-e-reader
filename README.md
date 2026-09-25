@@ -25,6 +25,8 @@ DefaultArticleFetcher downloads each article (several at a time) and runs an ext
 
 The result is then cleaned up for e-readers (`default_modules/kindle_html_formatter.py`): only simple, semantic tags are kept, lazy-loaded images and relative links are fixed, share buttons/newsletter sign-ups/related-article lists are removed, and layout tables (common in email newsletters) are flattened. If a page can't be fetched (paywalls, bot blocking), the content from your RSS feed is used instead, with a note saying so.
 
+Some sites turn away scripts based on how the connection looks (its TLS and HTTP/2 fingerprint), whatever the User-Agent says. When a request looks blocked (a 401/403/429/503, or a bot-check page), it's retried with [curl_cffi](https://github.com/lexiforest/curl_cffi) impersonating Chrome. Plain requests are tried first because a few sites do the opposite. Choose the browser with `DefaultArticleFetcher(..., impersonate_browser='safari')`, or turn this off with `impersonate_browser=None`. It won't get past JavaScript challenges ("Just a moment...") or real paywalls; for sites you subscribe to, pass a `requests.Session` carrying your cookies as `session=` (they're used for the impersonated retry too). curl_cffi is optional: without it, blocked pages simply aren't retried.
+
 To see how well a page extracts, run `python3 sample_urls_to_epub.py <url> [<url> ...] -o test` and open `test.epub`.
 
 ## Basic Usage
@@ -33,6 +35,7 @@ To see how well a page extracts, run `python3 sample_urls_to_epub.py <url> [<url
 3. Install the dependencies with `pip install -r requirements.txt`. This library relies on:
     - [trafilatura](https://trafilatura.readthedocs.io) and [readability-lxml](https://github.com/buriy/python-readability) to find the article in a web page, and [BeautifulSoup4](https://beautiful-soup-4.readthedocs.io/en/latest/) to clean it up.
     - [EbookLib](https://github.com/aerkalov/ebooklib) and [Pillow](https://python-pillow.org) to build EPUB files and shrink images for e-readers.
+    - [curl_cffi](https://github.com/lexiforest/curl_cffi) (optional) to retry pages that block scripts while impersonating a browser.
     - mypy for static type checking (not necessary unless you're building custom modules)
 4. To see basic usage, take a look at the examples folder. The sample_ttrss.py and the sample_markdown.py files show two different approaches. In either file, in the marked variables and run from your terminal as outlined in the comments at the top of the selected file. 
 
