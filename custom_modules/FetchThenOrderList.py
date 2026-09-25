@@ -44,7 +44,7 @@ class FetchThenOrderList(DefaultListCreator, DefaultArticleFetcher):
 
     def _get_articles_max_num_articles(self) -> List[DefaultArticle]:
         meta = super().get_article_metadatas()
-        return self._get_articles_given_meta(meta)
+        return self._get_articles_given_meta(meta, self._wpm)
 
     def _hit_max_time(self, curr_time: int) -> bool:
         if self._max_time < 0:
@@ -54,21 +54,20 @@ class FetchThenOrderList(DefaultListCreator, DefaultArticleFetcher):
     
     def _get_articles_max_time(self) -> Sequence[DefaultArticle]:
         meta = super().get_article_metadatas()
+        for m in meta:
+            self._ensure_id(m)
         current_time = 0
         result: List[DefaultArticle] = []
         for i in range(len(meta)):
-            m = meta[i]
-            next_id = meta[i+1].id if i < len(meta) - 1 else meta[0].id
             if self._hit_max_time(current_time):
                 break
-            content, title, success = self._get_article_content(m)
-            if not success:
-                self.log_error(f"Failed to fetch article. Adding the following error message to document:\n{content}")
-            article = DefaultArticle(m, title[:DefaultArticleFetcher.TITLE_CUTOFF], content,next_id,self._wpm)
+            next_id = meta[i+1].id if i < len(meta) - 1 else 'top'
+            article = self._build_article(meta[i], next_id, self._wpm)
             result.append(article)
             current_time += article.time_to_read_in_minutes()
         # Rewrite the next_id on the last one to cycle back to the beginning
-        result[-1].next_id = 'top'
+        if result:
+            result[-1].next_id = 'top'
         return result
 
     def get_articles(self) -> Sequence[DefaultArticle]:

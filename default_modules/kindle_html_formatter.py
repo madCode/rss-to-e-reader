@@ -146,27 +146,11 @@ def clean_html(
     return str(soup).strip()
 
 
-def clean_for_kindle(parser):
+def clean_for_kindle(parser: BeautifulSoup) -> BeautifulSoup:
     """
-    Legacy cleanup used by DefaultArticleFetcher: removes images and scripts from the parser in place.
-    Superseded by clean_html(); kept as-is until the fetcher switches over.
+    Kept for backwards compatibility with custom modules. Prefer clean_html().
     """
-    parser = _remove_images(parser)
-    parser = _remove_script(parser)
-    return parser
-
-
-def _remove_images(parser):
-    """
-    Kindles don't like images with svg extensions. That said, Kindles can't convert image urls into images anyway, so let's just remove all images.
-    """
-    [img.extract() for img in parser.findAll('img')]
-    return parser
-
-
-def _remove_script(parser):
-    [script.extract() for script in parser.findAll('script')]
-    return parser
+    return BeautifulSoup(clean_html(str(parser)), 'html.parser')
 
 
 def _classes_and_id(element: Tag) -> List[str]:
