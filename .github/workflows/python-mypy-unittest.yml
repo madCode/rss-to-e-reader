@@ -4,10 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
-    # 'edited' re-runs checks when a PR's base branch changes (e.g. the PR below it in a stack merges).
-    # It also fires on title and description edits.
-    types: [opened, synchronize, reopened, edited]
-  # Push runs are limited to main; this adds a "Run workflow" button for checking any other branch.
+    types: [opened, synchronize, reopened, edited]  # edited: re-check when a PR's base changes
   workflow_dispatch:
 
 jobs:
