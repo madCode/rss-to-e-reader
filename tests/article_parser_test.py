@@ -71,10 +71,29 @@ class TestArticleParser(unittest.TestCase):
         self.assertIn('only this', article.html)
 
     def test_find_site_rule(self):
-        self.assertIsNotNone(find_site_rule('https://aeon.co/essays/x'))
-        self.assertIsNotNone(find_site_rule('https://www.smithsonianmag.com/history/x'))
-        self.assertIsNone(find_site_rule('https://notaeon.co/essays/x'))
-        self.assertIsNone(find_site_rule('https://example.com/'))
+        self.assertIsNotNone(find_site_rule('https://www.nytimes.com/2026/01/01/x.html'))
+        self.assertIsNotNone(find_site_rule('https://www.the-tls.com/regular-features/x'))
+        self.assertIsNotNone(find_site_rule('https://www.the-tls.co.uk/articles/x'))
+        self.assertIsNone(find_site_rule('https://notnytimes.com/x'))
+        self.assertIsNone(find_site_rule('https://aeon.co/essays/x'))  # handled by the generic extractors
+
+    def test_the_tls_rule_reads_the_article_from_the_api(self):
+        page = ('<html><body><div id="app"></div><script>var tlsPageObject = {"spotId":"sp_x","postId":"219571",'
+                '"ID":"219571","restUrl":"https:\\/\\/www.the-tls.com\\/wp-json\\/tls\\/v2"};</script></body></html>')
+        fetched = []
+        def fetch(url):
+            fetched.append(url)
+            return json.dumps({'content': f'<p>{LONG_TEXT}</p>'})
+        article = extract_article(page, 'https://www.the-tls.com/regular-features/x', fetch=fetch)
+        self.assertEqual(fetched, ['https://www.the-tls.com/wp-json/tls/v2/single-article/219571'])
+        self.assertEqual(article.extractor, 'site rule')
+        self.assertGreater(article.word_count, 250)
+
+    def test_the_tls_rule_ignores_a_rest_url_on_another_site(self):
+        page = '<script>var tlsPageObject = {"ID":"7","restUrl":"https://evil.example/api"};</script>'
+        fetched = []
+        extract_article(page, 'https://www.the-tls.com/x', fetch=lambda u: fetched.append(u) or '{}')
+        self.assertEqual(fetched, ['https://www.the-tls.com/wp-json/tls/v2/single-article/7'])
 
     def test_clean_title(self):
         self.assertEqual(clean_title('E-reader - Wikipedia', 'Wikimedia Foundation', 'https://en.wikipedia.org/wiki/E-reader'), 'E-reader')

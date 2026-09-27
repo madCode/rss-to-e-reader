@@ -102,20 +102,36 @@ def select_rule(*selectors: str) -> SiteRule:
 
 
 def _the_tls(soup: BeautifulSoup, url: str, fetch: Callable[[str], str]) -> Optional[str]:
+    """
+    TLS pages are JavaScript shells: the generic extractors find no text in them. The page's tlsPageObject names
+    the article's id and the site's REST API, which returns the text. Without a subscription the API returns a
+    preview of a few hundred words; a session carrying your TLS cookies should get the full article.
+    """
     script = soup.find(string=re.compile('tlsPageObject'))
-    match = re.search(r'tlsPageObject = \{"ID":"(\d+)"', str(script)) if script else None
-    if not match:
+    if not script:
         return None
-    data = json.loads(fetch('https://www.the-tls.co.uk/wp-json/tls/v2/single-article/' + match.group(1)))
+    page_object = str(script)
+    article_id = re.search(r'"ID"\s*:\s*"?(\d+)', page_object)  # not always the first key
+    if not article_id:
+        return None
+    host = urlparse(url).hostname or 'www.the-tls.com'
+    rest_url = f'https://{host}/wp-json/tls/v2'
+    declared = re.search(r'"restUrl"\s*:\s*"([^"]+)"', page_object)
+    if declared:
+        candidate = declared.group(1).replace('\\/', '/')
+        if urlparse(candidate).hostname == host:  # only follow the page to its own site
+            rest_url = candidate
+    data = json.loads(fetch(f"{rest_url.rstrip('/')}/single-article/{article_id.group(1)}"))
     return data.get('content')
 
 
+# Rules only for sites the generic extractors can't handle (checked September 2026). Aeon, Smithsonian and
+# The New Criterion used to have rules; their selectors no longer matched and the generic extractors get
+# their articles whole.
 SITE_RULES: Dict[str, SiteRule] = {
-    'nytimes.com': select_rule('section[name=articleBody]'),
-    'newcriterion.com': select_rule('div.article-text-column'),
-    'smithsonianmag.com': select_rule('div.article-body'),
-    'aeon.co': select_rule('div.article__body__content', 'div[data-component="essay-body"]'),
-    'the-tls.co.uk': _the_tls,
+    'nytimes.com': select_rule('section[name=articleBody]'),  # untested: nytimes.com blocks scripts
+    'the-tls.com': _the_tls,
+    'the-tls.co.uk': _the_tls,  # the TLS's old domain
 }
 
 
