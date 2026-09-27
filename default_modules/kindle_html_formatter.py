@@ -392,7 +392,7 @@ def _remove_duplicate_title(soup: BeautifulSoup, title: str):
 
 
 def _normalize_headings(soup: BeautifulSoup):
-    """The article title is the only <h1>; content headings start at <h2>."""
+    """The article title is to be the only <h1>; content headings must start at <h2>. If the non-title content contains an H1, then shift everything down so the H1 becomes H2, the H2 becomes H3, etc. If there is no H1 heading, do nothing."""
     headings = soup.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6'])
     if not headings:
         return
