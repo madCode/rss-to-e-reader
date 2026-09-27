@@ -2,6 +2,7 @@ from bs4 import BeautifulSoup # type: ignore
 import json
 import requests
 import re
+from typing import Any
 
 def get_bs4_parser(link: str) -> BeautifulSoup:
     headers = {'User-Agent': 'Mozilla/5.0 (Android 7.0; Mobile; rv:54.0) Gecko/54.0 Firefox/54.0'}
@@ -9,13 +10,15 @@ def get_bs4_parser(link: str) -> BeautifulSoup:
     html_str = response.content.decode("UTF-8")
     return BeautifulSoup(html_str, features="html.parser")
 
-def get_nytimes_article(parser: BeautifulSoup):
+# These parsers take Any rather than BeautifulSoup: bs4 now ships type hints, and a missing element
+# (None) already raises here and is reported by DefaultArticleFetcher as a failed fetch.
+def get_nytimes_article(parser: Any):
     return parser.body.find('section',attrs={'name':'articleBody'})
 
-def get_spectator_article(parser: BeautifulSoup):
+def get_spectator_article(parser: Any):
     return parser.body.find('main',attrs={'class':'ContentPageBody-module__body__container'})
 
-def get_new_criterion(parser: BeautifulSoup):
+def get_new_criterion(parser: Any):
     title = parser.body.find('div',attrs={'class':'article-title-container'}).prettify()
     return BeautifulSoup(title + parser.body.find('div',attrs={'class':'article-text-column'}).prettify(), features='html.parser')
 
@@ -25,7 +28,7 @@ def get_smithsonian_mag(parser: BeautifulSoup):
 def get_aeon(parser: BeautifulSoup):
     return parser.find('div', attrs={'class':'article__body__content'})
 
-def get_the_tls(parser: BeautifulSoup):
+def get_the_tls(parser: Any):
     idString = parser.find(text=re.compile("tlsPageObject"))
     pattern = re.compile(r'tlsPageObject = \{\"ID\":\"(\d+)\"\,')
     idNum = pattern.findall(idString)[0]
@@ -37,7 +40,7 @@ def get_the_tls(parser: BeautifulSoup):
     article_html = re.sub(r"\s+"," ",article)
     return BeautifulSoup(article_html, features="html.parser")
 
-def get_tablet_mag(parser: BeautifulSoup):
+def get_tablet_mag(parser: Any):
     element = parser.find(text=re.compile('{"@id":"https://www.tabletmag.com/'))
     pattern = re.compile(r'\{"@id"\:".+"@type":"Article","name":"(.+)","headline":"(.+)","articleBody":"(.+)","author')
     matcher = re.match(pattern, element)
