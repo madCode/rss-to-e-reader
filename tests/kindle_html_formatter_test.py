@@ -23,6 +23,13 @@ class TestCleanHtml(unittest.TestCase):
         html = '<div class="comment-body"><p>' + 'word ' * 100 + '</p></div>'
         self.assertIn('word', clean_html(html))
 
+    def test_keeps_paragraphs_in_paywall_containers(self):
+        # The New Yorker wraps each run of article paragraphs in a div with class "paywall"
+        sections = ''.join(f'<div class="body__inner-container paywall"><p>Section {i} {"text " * 30}</p></div>' for i in range(4))
+        cleaned = clean_html(f'<div>{sections}</div>')
+        for i in range(4):
+            self.assertIn(f'Section {i}', cleaned)
+
     def test_strips_attributes_and_unknown_tags(self):
         cleaned = clean_html('<p class="x" style="color:red" onclick="evil()"><span><font>Hi</font></span> <b data-x="1">there</b></p>')
         self.assertEqual(cleaned, '<p>Hi <b>there</b></p>')

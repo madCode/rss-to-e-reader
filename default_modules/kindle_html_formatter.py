@@ -42,11 +42,12 @@ ALLOWED_ATTRIBUTES: Dict[str, Set[str]] = {
 GLOBAL_ATTRIBUTES: Set[str] = {'id'}
 
 # class/id tokens that mark page furniture rather than article text.
+# Not 'paywall': sites like The New Yorker use it on the containers of the article's own paragraphs.
 JUNK_TOKENS: Set[str] = {
     'ad', 'ads', 'advert', 'advertisement', 'adsbygoogle', 'promo', 'promotion', 'newsletter', 'subscribe',
     'subscription', 'signup', 'share', 'sharing', 'social', 'related', 'recommended', 'recommendations',
     'comments', 'comment', 'sidebar', 'popup', 'modal', 'cookie', 'cookies', 'banner', 'sponsored',
-    'outbrain', 'taboola', 'paywall', 'breadcrumb', 'breadcrumbs', 'toolbar',
+    'outbrain', 'taboola', 'breadcrumb', 'breadcrumbs', 'toolbar',
 }
 
 # Attributes sites use to lazy-load images, in order of preference.
