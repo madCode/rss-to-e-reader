@@ -36,6 +36,8 @@ class TestLooksBlocked(unittest.TestCase):
     def test_challenge_pages(self):
         self.assertTrue(looks_blocked(response(200, b'<html><head><title>Just a moment...</title></head></html>')))
         self.assertTrue(looks_blocked(response(200, b'<script src="https://geo.captcha-delivery.com/x.js"></script>')))
+        # the TLS serves this with a 200 to scripts
+        self.assertTrue(looks_blocked(response(200, b'<html><head><title>Verifying Device</title></head></html>')))
         # a long real page that happens to mention a marker is not a challenge
         self.assertFalse(looks_blocked(response(200, b'challenge-platform ' + b'x' * 200 * 1024)))
 

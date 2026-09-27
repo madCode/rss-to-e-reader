@@ -23,7 +23,8 @@ DEFAULT_IMPERSONATE = 'chrome'
 BLOCKED_STATUS_CODES = {401, 403, 429, 503}
 # Text found in bot-check pages that some sites serve with a 200 status.
 CHALLENGE_MARKERS = (
-    '<title>Just a moment...</title>', 'cf-browser-verification', 'challenge-platform', '_Incapsula_Resource',
+    '<title>Just a moment...</title>', '<title>Verifying Device</title>', 'cf-browser-verification',
+    'challenge-platform', '_Incapsula_Resource',
     'captcha-delivery.com', 'px-captcha', 'Enable JavaScript and cookies to continue',
 )
 CHALLENGE_PAGE_MAX_BYTES = 150 * 1024
