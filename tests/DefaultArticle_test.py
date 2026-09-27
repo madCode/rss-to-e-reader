@@ -70,8 +70,6 @@ class TestDefaultArticle(unittest.TestCase):
         self.assertIn('CONTENTS', html)
         self.assertIn('↑ Contents', html)
         self.assertNotIn('Next article', html)
-        # 'top', which older callers pass for the last article, means the same
-        self.assertEqual(DefaultArticle(MOCK_ARTICLE_METADATA_DO_NOT_FETCH, "DISPLAY_TITLE", next_id="top", wpm=-1).to_html_string(), html)
 
     def test_to_html_string_escapes(self):
         a = DefaultArticle(MOCK_ARTICLE_METADATA_DO_NOT_FETCH, "Cats & <dogs>", "<p>x</p>", note='Fetch "failed"')

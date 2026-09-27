@@ -88,7 +88,7 @@ class DefaultArticle(Article):
 
     def to_html_string(self) -> str:
         nav = f'<p class="article-nav"><a href="#top">↑ Contents</a>'
-        if self.next_id and self.next_id != 'top':  # older callers pass 'top' for the last article
+        if self.next_id:
             nav += f' · <a href="#{DefaultArticle.anchor_for(self.next_id)}">Next article →</a>'
         nav += '</p>'
         return f'<section class="article" id="{self.anchor_id}">\n{self.body_html()}\n{nav}\n</section>\n'
