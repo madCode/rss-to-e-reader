@@ -1,3 +1,4 @@
+from datetime import date
 import unittest
 
 from ArticleMetadata_mocks import MOCK_ARTICLE_METADATA_DO_NOT_FETCH
@@ -59,7 +60,7 @@ class TestDefaultArticle(unittest.TestCase):
     def test_to_html_string(self):
         self.maxDiff = None
         a = DefaultArticle(MOCK_ARTICLE_METADATA_DO_NOT_FETCH, "DISPLAY_TITLE", "<p>Some words here.</p>", "next_id",
-                           author="Jane Doe", published="2025-03-04")
+                           author="Jane Doe", published=date(2025, 3, 4))
         self.assertEqual(a.to_html_string(), DEFAULT_ARTICLE_HTML_STRING)
 
         # no reading time without wpm, no next link at the end, falls back to meta content

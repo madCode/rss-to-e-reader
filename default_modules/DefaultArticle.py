@@ -1,7 +1,8 @@
 from base_classes.article import Article
 from base_classes.ArticleMetadata import ArticleMetadata
+from datetime import date
 from html import escape
-from typing import List
+from typing import List, Optional
 
 """
 An Article contains enough information for the article to be rendered anywhere.
@@ -9,7 +10,7 @@ An Article contains enough information for the article to be rendered anywhere.
 class DefaultArticle(Article):
     def __init__(
         self, meta: ArticleMetadata, display_title: str = "", display_content: str ="", next_id: str ="", wpm: int = 200,
-        author: str = "", published: str = "", note: str = ""):
+        author: str = "", published: Optional[date] = None, note: str = ""):
         """
         Parameters
         ----------
@@ -28,8 +29,8 @@ class DefaultArticle(Article):
             Pass in -1 to not use wpm in rendering.
         author: str, optional
             Author(s) of the article, shown in the byline.
-        published: str, optional
-            Publication date of the article, shown in the byline.
+        published: date, optional
+            Publication date of the article, shown in the byline (e.g. "4 March 2025").
         note: str, optional
             A short note shown above the article, e.g. to say the full text couldn't be fetched.
         """
@@ -66,7 +67,8 @@ class DefaultArticle(Article):
         return str(per_hour) + ' hr ' + str(remainder) + ' min'
 
     def byline_parts(self) -> List[str]:
-        parts = [p for p in (self.meta.source_title, self.author, self.published) if p]
+        published = f'{self.published.day} {self.published:%B %Y}' if self.published else ''
+        parts = [p for p in (self.meta.source_title, self.author, published) if p]
         stats = f'{self.word_count:,} words'
         if self._wpm > 0:
             stats += f' · {self.time_to_read_str()}'
