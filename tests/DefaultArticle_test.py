@@ -63,12 +63,15 @@ class TestDefaultArticle(unittest.TestCase):
                            author="Jane Doe", published=date(2025, 3, 4))
         self.assertEqual(a.to_html_string(), DEFAULT_ARTICLE_HTML_STRING)
 
-        # no reading time without wpm, no next link at the end, falls back to meta content
-        a = DefaultArticle(MOCK_ARTICLE_METADATA_DO_NOT_FETCH, "DISPLAY_TITLE", next_id="top", wpm=-1)
+        # no reading time without wpm, no next link for the last article, falls back to meta content
+        a = DefaultArticle(MOCK_ARTICLE_METADATA_DO_NOT_FETCH, "DISPLAY_TITLE", wpm=-1)
         html = a.to_html_string()
         self.assertIn('<p class="byline">FEED TITLE · 1 words</p>', html)
         self.assertIn('CONTENTS', html)
+        self.assertIn('↑ Contents', html)
         self.assertNotIn('Next article', html)
+        # 'top', which older callers pass for the last article, means the same
+        self.assertEqual(DefaultArticle(MOCK_ARTICLE_METADATA_DO_NOT_FETCH, "DISPLAY_TITLE", next_id="top", wpm=-1).to_html_string(), html)
 
     def test_to_html_string_escapes(self):
         a = DefaultArticle(MOCK_ARTICLE_METADATA_DO_NOT_FETCH, "Cats & <dogs>", "<p>x</p>", note='Fetch "failed"')

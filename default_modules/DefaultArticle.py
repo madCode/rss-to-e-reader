@@ -23,7 +23,7 @@ class DefaultArticle(Article):
             Content you want displayed when Article is rendered. Defaults to meta.content
             Should already be cleaned HTML (see kindle_html_formatter.clean_html).
         next_id: str, optional
-            The id of the Article coming after this. Defaults to empty string. 'top' links back to the table of contents.
+            The id of the Article coming after this, for its "Next article" link. Leave empty for the last article.
         wpm: int, optional
             The words per minute the user reads at. Defaults to 200.
             Pass in -1 to not use wpm in rendering.
@@ -45,7 +45,7 @@ class DefaultArticle(Article):
     @staticmethod
     def anchor_for(article_id: str) -> str:
         """HTML id for an article. XHTML ids can't start with a digit, so ids are prefixed."""
-        return 'top' if article_id == 'top' else f'article-{article_id}'
+        return f'article-{article_id}'
 
     @property
     def anchor_id(self) -> str:
@@ -88,7 +88,7 @@ class DefaultArticle(Article):
 
     def to_html_string(self) -> str:
         nav = f'<p class="article-nav"><a href="#top">↑ Contents</a>'
-        if self.next_id and self.next_id != 'top':
+        if self.next_id and self.next_id != 'top':  # older callers pass 'top' for the last article
             nav += f' · <a href="#{DefaultArticle.anchor_for(self.next_id)}">Next article →</a>'
         nav += '</p>'
         return f'<section class="article" id="{self.anchor_id}">\n{self.body_html()}\n{nav}\n</section>\n'
