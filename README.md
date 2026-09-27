@@ -40,5 +40,12 @@ The examples folder contains samples of how to hook the modules together. They f
 ### Help grow the library!
 If you create a Module that you feel others will benefit from, open a PR. The architecture is designed (with unit tests) to make collaboration and group improvement as easy as possible. This library would benefit hugely from FileCreators that support different formats or ArticleFetchers that are smarter at getting the article contents. The world is our oyester.
 
+Every PR runs mypy and the unit tests, and at least 90% of the lines it changes must be covered by tests. To check before pushing:
+```
+python -m coverage run --source=base_classes,default_modules,custom_modules -m unittest discover -s tests -p "*_test.py"
+python -m coverage report
+python -m coverage xml && diff-cover coverage.xml --compare-branch=origin/main --fail-under=90
+```
+
 ## Questions?
 If you have any questions or need help making your own scripts, feel free to open a Github issue with a title beginning with `[Question]`.
