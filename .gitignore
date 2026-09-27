@@ -2,6 +2,8 @@
 .*
 !.gitignore
 __pycache__
+coverage.xml
+htmlcov/
 
 personal
 personal/*
