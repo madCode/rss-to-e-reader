@@ -54,8 +54,8 @@ class MarkdownCollector(Collector):
     def _load_urls(self):
         self.log_info("Loading urls from markdown list")
         try:
-            file = open(self._filepath, 'r')
-            lines = file.readlines()
+            with open(self._filepath, 'r') as file:
+                lines = file.readlines()
         except Exception as e:
             self.log_error(f"Could not load file. Skipping collecting articles. {e}")
             return
