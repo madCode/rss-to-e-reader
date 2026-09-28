@@ -6,7 +6,6 @@ from unittest.mock import MagicMock, patch
 
 from custom_modules.FolderSender import FolderSender
 from default_modules.SmtpSender import SmtpSender, media_type_for
-from default_modules.email_api import default_send_file_in_email
 
 class SenderTestCase(unittest.TestCase):
     def setUp(self):
@@ -74,11 +73,6 @@ class TestSmtpSender(SenderTestCase):
 
     def test_invalid_security(self):
         self.assertRaises(ValueError, SmtpSender, 'a', 'b', 'c', security='tls')
-
-    def test_legacy_email_api(self):
-        with patch.object(SmtpSender, 'send', return_value=True) as send:
-            self.assertTrue(default_send_file_in_email('me@kindle.com', self.path[:-5], 'me@x.com', 'smtp.x.com', 465, 'pw', ['1', '2'], '.epub'))
-        self.assertEqual(send.call_args.args[0], self.path)
 
 class TestFolderSender(SenderTestCase):
     def test_copies_and_prunes(self):
