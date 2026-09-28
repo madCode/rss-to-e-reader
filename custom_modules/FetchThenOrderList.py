@@ -4,7 +4,7 @@ from default_modules.DefaultArticle import DefaultArticle
 from default_modules.DefaultArticleFetcher import DefaultArticleFetcher
 from default_modules.DefaultListCreator import ArticleOrder, DefaultListCreator
 from enum import Enum
-from typing import Callable, List, Optional, Sequence
+from typing import Callable, List, Optional, Sequence, Union
 
 class MaxType(Enum):
     """
@@ -25,7 +25,7 @@ class FetchThenOrderList(DefaultListCreator, DefaultArticleFetcher):
         max_type: MaxType = MaxType.NUM_ARTICLES, max_per_source_id: int = -1,
         max_val: int = -1, reading_speed_wpm: int = 300,
         should_call_used_articles_callback: bool = True,
-        replace_table_source_ids: List[str] = [],
+        replace_table_source_ids: Sequence[Union[str, int]] = [],
         error_log_callback: Optional[Callable] = print, info_log_callback: Optional[Callable] = print):
 
         max_num_articles = max_val if max_type == MaxType.NUM_ARTICLES else -1

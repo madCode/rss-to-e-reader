@@ -243,5 +243,30 @@ class TestTtrssCollector(unittest.TestCase):
         inst.get_article_metadatas()
         info.assert_called_once_with('loading article from ttrss 0/1')
 
+    def _metadatas_for(self, headline, fetch_list):
+        inst = TtrssCollector("testurl", fetch_from_url_source_id_list=fetch_list, info_log_callback=None)
+        inst._session_id = "987"
+        inst._send_ttrss_post_request = mock.MagicMock(return_value={'seq': 0, 'status': 1, 'content': [headline]})
+        inst._login = mock.MagicMock()
+        inst._logout = mock.MagicMock()
+        return inst.get_article_metadatas()
+
+    def test_int_feed_id_matches_either_list_type(self):
+        # tt-rss sends feed_id as an int; configs list feed ids as strings or ints
+        headline = {**MOCK_HEADLINE, 'feed_id': 111}
+        for fetch_list in (['111'], [111]):
+            with self.subTest(fetch_list=fetch_list):
+                articles = self._metadatas_for(headline, fetch_list)
+                self.assertTrue(articles[0].fetch_content_from_url)
+                self.assertEqual(articles[0].source_id, '111')
+
+    def test_str_feed_id_matches_an_int_list(self):
+        articles = self._metadatas_for(MOCK_HEADLINE, [111])
+        self.assertTrue(articles[0].fetch_content_from_url)
+
+    def test_other_feeds_are_not_fetched(self):
+        articles = self._metadatas_for({**MOCK_HEADLINE, 'feed_id': 222}, ['111', 111])
+        self.assertFalse(articles[0].fetch_content_from_url)
+
 if __name__ == '__main__':
     unittest.main()

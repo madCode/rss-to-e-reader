@@ -12,7 +12,7 @@ from html import escape
 import re
 import requests
 import threading
-from typing import List, Callable, Optional, Sequence
+from typing import List, Callable, Optional, Sequence, Union
 
 def _parse_date(value: str) -> Optional[date]:
     """The extractors give dates as ISO strings ('2025-03-04'); anything else is left out of the byline."""
@@ -42,7 +42,7 @@ class DefaultArticleFetcher(ArticleFetcher):
     # libxml2, which lxml/trafilatura/readability are built on, has a history of thread-safety bugs.
     _PARSE_LOCK = threading.Lock()
     def __init__(
-        self, meta: List[ArticleMetadata], replace_table_source_ids: List[str] = [],
+        self, meta: List[ArticleMetadata], replace_table_source_ids: Sequence[Union[str, int]] = [],
         error_log_callback: Optional[Callable] = print, info_log_callback: Optional[Callable] = print,
         keep_images: bool = True, timeout: float = article_parser.DEFAULT_TIMEOUT, max_workers: int = 4,
         session: Optional[requests.Session] = None, impersonate_browser: Optional[str] = DEFAULT_IMPERSONATE):
@@ -55,6 +55,7 @@ class DefaultArticleFetcher(ArticleFetcher):
             Sometimes you want to replace <table> HTML elements with normal divs. This field allows you to pass in
             source_ids for which you'd like that replacement to happen. Tables that look like page layout (common in
             email newsletters) are always replaced; this forces every table from those sources to be replaced.
+            Ids can be given as strings or ints.
         error_log_callback: Optional[Callable], optional
         info_log_callback: Optional[Callable], optional
         keep_images: bool, optional
@@ -85,9 +86,10 @@ class DefaultArticleFetcher(ArticleFetcher):
             meta.id = hashlib.sha1(meta.url.encode('utf-8')).hexdigest()[:12]
 
     def _clean(self, meta: ArticleMetadata, html: str, base_url: str, title: str) -> str:
+        # Feed ids arrive as ints from tt-rss and as ints or strings from configs, so compare them as strings.
         return clean_html(
             html, base_url=base_url, keep_images=self._keep_images,
-            flatten_tables=meta.source_id in self._replace_table_sources,
+            flatten_tables=str(meta.source_id) in {str(i) for i in self._replace_table_sources},
             title=title, id_prefix=f'a{re.sub(r"[^A-Za-z0-9]", "", meta.id)}-',
         )
 
