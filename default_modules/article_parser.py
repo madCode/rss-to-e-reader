@@ -125,11 +125,9 @@ def _the_tls(soup: BeautifulSoup, url: str, fetch: Callable[[str], str]) -> Opti
     return data.get('content')
 
 
-# Rules only for sites the generic extractors can't handle (checked September 2026). Aeon, Smithsonian and
-# The New Criterion used to have rules; their selectors no longer matched and the generic extractors get
-# their articles whole.
+# Rules only for sites the generic extractors can't handle (checked September 2026). Aeon, Smithsonian,
+# The New Criterion and the NYT used to have rules; the generic extractors get their articles whole.
 SITE_RULES: Dict[str, SiteRule] = {
-    'nytimes.com': select_rule('section[name=articleBody]'),  # untested: nytimes.com blocks scripts
     'the-tls.com': _the_tls,
     'the-tls.co.uk': _the_tls,  # the TLS's old domain
 }

@@ -6,7 +6,7 @@ from unittest.mock import patch
 import requests
 
 import default_modules.article_parser as article_parser
-from default_modules.article_parser import clean_title, extract_article, fetch_html, find_site_rule, title_from_url
+from default_modules.article_parser import clean_title, extract_article, fetch_html, find_site_rule, select_rule, title_from_url
 
 FIXTURE = open(os.path.join(os.path.dirname(__file__), 'fixtures', 'article_page.html'), encoding='utf-8').read()
 LONG_TEXT = ' '.join(['word'] * 300)
@@ -38,12 +38,14 @@ class TestArticleParser(unittest.TestCase):
 
     def test_site_rule_wins_when_it_finds_enough_text(self):
         html = f'<html><body><section name="articleBody"><p>{LONG_TEXT}</p></section><div>other</div></body></html>'
-        article = extract_article(html, 'https://www.nytimes.com/2024/01/01/story.html')
+        with patch.dict(article_parser.SITE_RULES, {'example.org': select_rule('section[name=articleBody]')}):
+            article = extract_article(html, 'https://www.example.org/2024/01/01/story.html')
         self.assertEqual(article.extractor, 'site rule')
         self.assertTrue(article.html.startswith('<section name="articleBody">'))
 
     def test_site_rule_miss_falls_through(self):
-        article = extract_article(FIXTURE, 'https://www.nytimes.com/2024/01/01/story.html')
+        with patch.dict(article_parser.SITE_RULES, {'example.com': select_rule('section[name=articleBody]')}):
+            article = extract_article(FIXTURE, 'https://example.com/culture/slow')
         self.assertEqual(article.extractor, 'trafilatura')
 
     def test_prefers_readability_when_it_finds_much_more_text(self):
@@ -71,11 +73,12 @@ class TestArticleParser(unittest.TestCase):
         self.assertIn('only this', article.html)
 
     def test_find_site_rule(self):
-        self.assertIsNotNone(find_site_rule('https://www.nytimes.com/2026/01/01/x.html'))
         self.assertIsNotNone(find_site_rule('https://www.the-tls.com/regular-features/x'))
         self.assertIsNotNone(find_site_rule('https://www.the-tls.co.uk/articles/x'))
-        self.assertIsNone(find_site_rule('https://notnytimes.com/x'))
-        self.assertIsNone(find_site_rule('https://aeon.co/essays/x'))  # handled by the generic extractors
+        self.assertIsNone(find_site_rule('https://notthe-tls.com/x'))
+        # handled by the generic extractors
+        self.assertIsNone(find_site_rule('https://aeon.co/essays/x'))
+        self.assertIsNone(find_site_rule('https://www.nytimes.com/2026/01/01/x.html'))
 
     def test_the_tls_rule_reads_the_article_from_the_api(self):
         page = ('<html><body><div id="app"></div><script>var tlsPageObject = {"spotId":"sp_x","postId":"219571",'
