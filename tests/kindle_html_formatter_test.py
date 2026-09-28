@@ -30,6 +30,13 @@ class TestCleanHtml(unittest.TestCase):
         for i in range(4):
             self.assertIn(f'Section {i}', cleaned)
 
+    def test_keeps_article_body_marked_aria_hidden(self):
+        # The NYT's paywall script marks the whole article body aria-hidden; small aria-hidden bits still go
+        html = f'<section aria-hidden="true" inert=""><p>{"word " * 100}</p><span aria-hidden="true">icon</span></section>'
+        cleaned = clean_html(html)
+        self.assertIn('word', cleaned)
+        self.assertNotIn('icon', cleaned)
+
     def test_strips_attributes_and_unknown_tags(self):
         cleaned = clean_html('<p class="x" style="color:red" onclick="evil()"><span><font>Hi</font></span> <b data-x="1">there</b></p>')
         self.assertEqual(cleaned, '<p>Hi <b>there</b></p>')

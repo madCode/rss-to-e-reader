@@ -1,82 +1,335 @@
-from bs4 import BeautifulSoup # type: ignore
+"""
+Fetches web pages and pulls the article out of them.
+
+extract_article() runs a pipeline of extractors and keeps the first result with enough text:
+1. A site-specific rule from SITE_RULES, if the url's host matches one.
+2. trafilatura (https://trafilatura.readthedocs.io), a well-maintained main-content extractor.
+3. readability-lxml, a port of the algorithm behind Firefox's Reader View. Both generic extractors run;
+   trafilatura's output is cleaner so it wins unless readability finds READABILITY_PREFERENCE_RATIO times
+   as much text (trafilatura occasionally stops after the first few paragraphs of long, image-heavy pages).
+4. schema.org JSON-LD `articleBody`. Many sites (including some paywalled ones) ship the full text here.
+5. The whole <body>, as a last resort. The sanitizer in kindle_html_formatter strips it down.
+
+If no stage reaches MIN_WORDS, the longest result wins. The returned HTML is not sanitized yet:
+pass it through kindle_html_formatter.clean_html() before rendering.
+"""
+from dataclasses import dataclass
 import json
-import requests
 import re
-from typing import Any
+from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple
+from urllib.parse import urlparse
 
-def get_bs4_parser(link: str) -> BeautifulSoup:
-    headers = {'User-Agent': 'Mozilla/5.0 (Android 7.0; Mobile; rv:54.0) Gecko/54.0 Firefox/54.0'}
-    response = requests.get(link, headers=headers)
-    html_str = response.content.decode("UTF-8")
-    return BeautifulSoup(html_str, features="html.parser")
+from bs4 import BeautifulSoup, UnicodeDammit  # type: ignore
+import requests
+import trafilatura  # type: ignore
+from readability import Document  # type: ignore
 
-# These parsers take Any rather than BeautifulSoup: bs4 now ships type hints, and a missing element
-# (None) already raises here and is reported by DefaultArticleFetcher as a failed fetch.
-def get_nytimes_article(parser: Any):
-    return parser.body.find('section',attrs={'name':'articleBody'})
+from default_modules.browser_impersonation import DEFAULT_IMPERSONATE, impersonated_get, looks_blocked
+from default_modules.kindle_html_formatter import attr, count_words, text_to_html
 
-def get_spectator_article(parser: Any):
-    return parser.body.find('main',attrs={'class':'ContentPageBody-module__body__container'})
+USER_AGENT = (
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) '
+    'Chrome/126.0 Safari/537.36'
+)
+DEFAULT_HEADERS = {
+    'User-Agent': USER_AGENT,
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    'Accept-Language': 'en-US,en;q=0.9',
+}
+DEFAULT_TIMEOUT = 20
+MIN_WORDS = 150
+# class/id substrings of cookie and consent banners (including common consent-management plugins).
+OVERLAY_MARKERS = ('cookie', 'consent', 'gdpr', 'cmplz', 'onetrust', 'didomi', 'usercentrics', 'truste')
+READABILITY_PREFERENCE_RATIO = 1.5
+TITLE_SEPARATORS = re.compile(r'\s+[|\-\u2013\u2014:\u00b7\u2022]\s+')
 
-def get_new_criterion(parser: Any):
-    title = parser.body.find('div',attrs={'class':'article-title-container'}).prettify()
-    return BeautifulSoup(title + parser.body.find('div',attrs={'class':'article-text-column'}).prettify(), features='html.parser')
 
-def get_smithsonian_mag(parser: BeautifulSoup):
-    return parser.find_all('div',{'class':'article-body pagination-first'})[0]
+@dataclass
+class ExtractedArticle:
+    html: str
+    title: str = ''
+    author: str = ''
+    date: str = ''
+    site_name: str = ''
+    extractor: str = ''
 
-def get_aeon(parser: BeautifulSoup):
-    return parser.find('div', attrs={'class':'article__body__content'})
+    @property
+    def word_count(self) -> int:
+        return count_words(self.html)
 
-def get_the_tls(parser: Any):
-    idString = parser.find(text=re.compile("tlsPageObject"))
-    pattern = re.compile(r'tlsPageObject = \{\"ID\":\"(\d+)\"\,')
-    idNum = pattern.findall(idString)[0]
-    url = "https://www.the-tls.co.uk/wp-json/tls/v2/single-article/" + idNum
-    headers = {'User-Agent': 'Mozilla/5.0 (Android 7.0; Mobile; rv:54.0) Gecko/54.0 Firefox/54.0'}
-    response = requests.get(url, headers=headers)
-    response_dict = json.loads(response.content.decode("UTF-8"))
-    article = response_dict['content'].replace('\n',' ').strip()
-    article_html = re.sub(r"\s+"," ",article)
-    return BeautifulSoup(article_html, features="html.parser")
 
-def get_tablet_mag(parser: Any):
-    element = parser.find(text=re.compile('{"@id":"https://www.tabletmag.com/'))
-    pattern = re.compile(r'\{"@id"\:".+"@type":"Article","name":"(.+)","headline":"(.+)","articleBody":"(.+)","author')
-    matcher = re.match(pattern, element)
-    article_title = matcher.group(2) if matcher else ""
-    article_body = matcher.group(3) if matcher else ""
-    article_body = '<p>' + re.sub(r'\.([A-Z])', r'.</p><p>\1', article_body) + '</p>'
-    html_str = '<html><head></head><body><h4>'+article_title+'</h4>'+article_body+'</body></html>'
-    return BeautifulSoup(html_str, features="html.parser").body
+def fetch_html(
+    url: str, timeout: float = DEFAULT_TIMEOUT, session: Optional[requests.Session] = None,
+    impersonate: Optional[str] = DEFAULT_IMPERSONATE,
+) -> Tuple[str, str]:
+    """
+    Downloads a page. If the site turns the request away as a bot (see browser_impersonation), it is retried
+    impersonating the `impersonate` browser. Pass impersonate=None to never retry.
 
-def replace_tables_with_divs(content_str: str) -> BeautifulSoup:
-    parser = BeautifulSoup(content_str, features="html.parser")
-    tables = parser.find_all('table')
-    if len(tables) == 0:
-        return parser
-    bodies = parser.find_all('tbody')
-    rows = parser.find_all('tr')
-    columns = parser.find_all('td')
-    for table in tables:
-        table.name = 'div'
-    for body in bodies:
-        body.name = 'div'
-    for row in rows:
-        row.name = 'div'
-    for column in columns:
-        column.name = 'div'
-    return parser
+    Returns
+    -------
+    (html, final_url): the decoded page and the url it ended up at after redirects.
+    Raises requests.HTTPError for 4xx/5xx responses.
+    """
+    getter = session.get if session is not None else requests.get
+    response: Any = getter(url, headers=DEFAULT_HEADERS, timeout=timeout)
+    if impersonate and looks_blocked(response):
+        retry = impersonated_get(url, impersonate, timeout, session)
+        # Only a successful retry replaces the original response, so failures report the original error.
+        if retry is not None and retry.status_code < 400 and not looks_blocked(retry):
+            response = retry
+    if isinstance(response, requests.Response):
+        response.raise_for_status()
+    return decode_response(response), str(response.url or url)
 
-special_parsers = {
-    'https://www.spectator.co.uk/': get_spectator_article,
-    'https://newcriterion.com/': get_new_criterion,
-    'https://www.smithsonianmag.com/': get_smithsonian_mag,
-    'https://aeon.co/': get_aeon,
-    'https://www.the-tls.co.uk/': get_the_tls,
-    'https://www.nytimes.com/': get_nytimes_article,
-    'https://www.tabletmag.com/': get_tablet_mag,
+
+def decode_response(response: Any) -> str:
+    """Decodes a requests (or curl_cffi) response's body."""
+    content_type = response.headers.get('content-type', '').lower()
+    if 'charset=' in content_type and response.encoding:
+        try:
+            return response.content.decode(response.encoding, errors='replace')
+        except LookupError:
+            pass
+    # No charset header: look at <meta charset>, then sniff.
+    dammit = UnicodeDammit(response.content, is_html=True)
+    return dammit.unicode_markup or response.content.decode('utf-8', errors='replace')
+
+
+# --- Site-specific rules -----------------------------------------------------------------------------
+# A rule gets the parsed page, its url and a function to fetch other urls, and returns article HTML or None.
+# Rules only need to exist for sites the generic extractors get wrong. Returning None falls through to them.
+SiteRule = Callable[[BeautifulSoup, str, Callable[[str], str]], Optional[str]]
+
+
+def select_rule(*selectors: str) -> SiteRule:
+    """A rule that returns the first element matching any of the CSS selectors."""
+    def rule(soup: BeautifulSoup, url: str, fetch: Callable[[str], str]) -> Optional[str]:
+        for selector in selectors:
+            elements = soup.select(selector)
+            if elements:
+                return ''.join(str(e) for e in elements)
+        return None
+    return rule
+
+
+def _the_tls(soup: BeautifulSoup, url: str, fetch: Callable[[str], str]) -> Optional[str]:
+    """
+    TLS pages are JavaScript shells: the generic extractors find no text in them. The page's tlsPageObject names
+    the article's id and the site's REST API, which returns the text. Without a subscription the API returns a
+    preview of a few hundred words; a session carrying your TLS cookies should get the full article.
+    """
+    script = soup.find(string=re.compile('tlsPageObject'))
+    if not script:
+        return None
+    page_object = str(script)
+    article_id = re.search(r'"ID"\s*:\s*"?(\d+)', page_object)  # not always the first key
+    if not article_id:
+        return None
+    host = urlparse(url).hostname or 'www.the-tls.com'
+    rest_url = f'https://{host}/wp-json/tls/v2'
+    declared = re.search(r'"restUrl"\s*:\s*"([^"]+)"', page_object)
+    if declared:
+        candidate = declared.group(1).replace('\\/', '/')
+        if urlparse(candidate).hostname == host:  # only follow the page to its own site
+            rest_url = candidate
+    data = json.loads(fetch(f"{rest_url.rstrip('/')}/single-article/{article_id.group(1)}"))
+    return data.get('content')
+
+
+# Rules only for sites the generic extractors can't handle (checked September 2026). Aeon, Smithsonian,
+# The New Criterion and the NYT used to have rules; the generic extractors get their articles whole.
+SITE_RULES: Dict[str, SiteRule] = {
+    'the-tls.com': _the_tls,
+    'the-tls.co.uk': _the_tls,  # the TLS's old domain
 }
 
 
-# TODO: a potential parser: look for a "skip to content" link and then look for the div that has that id
+def find_site_rule(url: str) -> Optional[SiteRule]:
+    host = (urlparse(url).hostname or '').lower()
+    for domain, rule in SITE_RULES.items():
+        if host == domain or host.endswith('.' + domain):
+            return rule
+    return None
+
+
+# --- Generic extractors ------------------------------------------------------------------------------
+
+def _trafilatura(html: str, url: str) -> Optional[str]:
+    return trafilatura.extract(
+        html, url=url or None, output_format='html', include_images=True, include_links=True,
+        include_formatting=True, include_tables=True, include_comments=False, favor_recall=True,
+    )
+
+
+def _readability(html: str, url: str) -> Optional[str]:
+    return Document(html, url=url or None).summary(html_partial=True)
+
+
+def _iter_json_ld(soup: BeautifulSoup) -> Iterator[Dict[str, Any]]:
+    for script in soup.find_all('script', attrs={'type': 'application/ld+json'}):
+        try:
+            data = json.loads(script.string or '')
+        except (ValueError, TypeError):
+            continue
+        stack = data if isinstance(data, list) else [data]
+        while stack:
+            item = stack.pop(0)
+            if isinstance(item, list):
+                stack.extend(item)
+            elif isinstance(item, dict):
+                yield item
+                stack.extend(item.get('@graph', []))
+
+
+def _json_ld_body(soup: BeautifulSoup) -> Optional[str]:
+    bodies = [item['articleBody'] for item in _iter_json_ld(soup) if isinstance(item.get('articleBody'), str)]
+    if not bodies:
+        return None
+    body = max(bodies, key=len)
+    return body if re.search(r'<\s*p[\s>]', body) else text_to_html(body)
+
+
+def _body(soup: BeautifulSoup) -> Optional[str]:
+    body = soup.body or soup
+    return str(body)
+
+
+def remove_overlays(soup: BeautifulSoup) -> bool:
+    """
+    Removes cookie/consent banners and modal dialogs from the page. They have to go before extraction:
+    trafilatura drops attributes, so their text would otherwise reach the sanitizer looking like ordinary
+    paragraphs. Returns whether anything was removed.
+    """
+    total_words = len(soup.get_text(' ').split()) or 1
+    removed = False
+    for element in soup.find_all(True):
+        if element.decomposed or element.name in ('html', 'head', 'body'):
+            continue
+        marks = f"{attr(element, 'class')} {attr(element, 'id')}".lower()
+        is_overlay = (
+            element.name == 'dialog' or attr(element, 'role') in ('dialog', 'alertdialog')
+            or attr(element, 'aria-modal') == 'true' or any(marker in marks for marker in OVERLAY_MARKERS)
+        )
+        # Safety net, as in clean_html: never remove most of the page because of an unlucky class name.
+        if is_overlay and len(element.get_text(' ').split()) / total_words < 0.4:
+            element.decompose()
+            removed = True
+    return removed
+
+
+# --- Metadata ----------------------------------------------------------------------------------------
+
+def clean_title(title: str, site_name: str = '', url: str = '', author: str = '') -> str:
+    """Removes a trailing site or author name, e.g. 'E-reader - Wikipedia' -> 'E-reader'."""
+    title = re.sub(r'\s+', ' ', title or '').strip()
+    parts = TITLE_SEPARATORS.split(title)
+    if len(parts) < 2:
+        return title
+    suffix = re.sub(r'[^a-z0-9]', '', parts[-1].lower())
+    host = (urlparse(url).hostname or '').lower()
+    host_words = [w for w in re.split(r'[.\-]', host) if w not in ('www', 'com', 'org', 'net', 'co', 'uk', '')]
+    site = re.sub(r'[^a-z0-9]', '', site_name.lower())
+    author_key = re.sub(r'[^a-z0-9]', '', author.lower())
+    matches_site = bool(suffix) and (
+        (site and (site in suffix or suffix in site)) or any(w in suffix for w in host_words if len(w) > 2)
+        or (len(author_key) > 3 and (author_key in suffix or suffix in author_key))
+    )
+    if matches_site and len(parts[-1].split()) <= 5:
+        last_separator = list(TITLE_SEPARATORS.finditer(title))[-1]
+        return title[:last_separator.start()].strip()
+    return title
+
+
+def title_from_url(url: str) -> str:
+    """A readable stand-in title, e.g. '.../2026/09/why-genre-matters/123' -> 'Why genre matters (example.com)'."""
+    parsed = urlparse(url)
+    host = (parsed.hostname or '').removeprefix('www.')
+    segments = [s for s in parsed.path.split('/') if s and not s.isdigit() and not re.fullmatch(r'[\d\W_]+', s)]
+    slug = re.sub(r'\.[a-z]+$', '', segments[-1]) if segments else ''
+    words = [w for w in re.split(r'[-_+]+', slug) if w]
+    if not words:
+        return host or url
+    return f"{' '.join(words).capitalize()} ({host})" if host else ' '.join(words).capitalize()
+
+
+def _clean_author(author: str) -> str:
+    author = re.sub(r'\s+', ' ', author or '').strip()
+    # Metadata extractors sometimes grab a whole block of page text as the "author".
+    return author if 0 < len(author) <= 80 and len(author.split()) <= 10 else ''
+
+
+def _metadata(html: str, url: str) -> Dict[str, str]:
+    try:
+        meta = trafilatura.extract_metadata(html, default_url=url or None)
+    except Exception:
+        meta = None
+    if meta is None:
+        return {}
+    return {
+        'title': clean_title(meta.title or '', meta.sitename or '', url, meta.author or ''),
+        'author': _clean_author(meta.author or ''),
+        'date': meta.date or '',
+        'site_name': meta.sitename or '',
+    }
+
+
+def extract_article(
+    html: str, url: str = '', fetch: Optional[Callable[[str], str]] = None, min_words: int = MIN_WORDS,
+) -> ExtractedArticle:
+    """
+    Parameters
+    ----------
+    html: str
+        The page's HTML.
+    url: str, optional
+        The page's url. Used to choose site rules and resolve relative links.
+    fetch: function taking a url and returning its body as a string, optional
+        Lets site rules make extra requests (e.g. to a JSON API). Defaults to fetch_html.
+    min_words: int, optional
+        A stage's result is accepted once it has at least this many words.
+    """
+    fetch = fetch or (lambda u: fetch_html(u)[0])
+    soup = BeautifulSoup(html, 'html.parser')
+    meta = _metadata(html, url)
+    if not meta.get('title'):
+        title_tag = soup.find('title')
+        meta['title'] = clean_title(title_tag.get_text() if title_tag else '', url=url)
+    if remove_overlays(soup):
+        html = str(soup)
+
+    def run(name: str, stage: Callable[[], Optional[str]]) -> Optional[ExtractedArticle]:
+        try:
+            content = stage()
+        except Exception:
+            return None
+        return ExtractedArticle(html=content, extractor=name, **meta) if content else None
+
+    candidates: List[ExtractedArticle] = []
+    rule = find_site_rule(url)
+    if rule is not None:
+        site_result = run('site rule', lambda: rule(soup, url, fetch))  # type: ignore
+        if site_result is not None:
+            if site_result.word_count >= min_words:
+                return site_result
+            candidates.append(site_result)
+
+    generic = [r for r in (run('trafilatura', lambda: _trafilatura(html, url)),
+                           run('readability', lambda: _readability(html, url))) if r is not None]
+    if generic:
+        chosen = generic[0]
+        if len(generic) == 2 and generic[1].word_count >= READABILITY_PREFERENCE_RATIO * generic[0].word_count:
+            chosen = generic[1] if generic[0].extractor == 'trafilatura' else generic[0]
+        if chosen.word_count >= min_words:
+            return chosen
+        candidates += generic
+
+    json_ld = run('json-ld', lambda: _json_ld_body(soup))
+    if json_ld is not None:
+        if json_ld.word_count >= min_words:
+            return json_ld
+        candidates.append(json_ld)
+
+    if candidates:
+        return max(candidates, key=lambda c: c.word_count)
+    return ExtractedArticle(html=_body(soup) or '', extractor='body', **meta)

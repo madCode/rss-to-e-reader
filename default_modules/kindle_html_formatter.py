@@ -147,27 +147,11 @@ def clean_html(
     return str(soup).strip()
 
 
-def clean_for_kindle(parser):
+def clean_for_kindle(parser: BeautifulSoup) -> BeautifulSoup:
     """
-    Legacy cleanup used by DefaultArticleFetcher: removes images and scripts from the parser in place.
-    Superseded by clean_html(); kept as-is until the fetcher switches over.
+    Kept for backwards compatibility with custom modules. Prefer clean_html().
     """
-    parser = _remove_images(parser)
-    parser = _remove_script(parser)
-    return parser
-
-
-def _remove_images(parser):
-    """
-    Kindles don't like images with svg extensions. That said, Kindles can't convert image urls into images anyway, so let's just remove all images.
-    """
-    [img.extract() for img in parser.findAll('img')]
-    return parser
-
-
-def _remove_script(parser):
-    [script.extract() for script in parser.findAll('script')]
-    return parser
+    return BeautifulSoup(clean_html(str(parser)), 'html.parser')
 
 
 def _classes_and_id(element: Tag) -> List[str]:
@@ -176,13 +160,17 @@ def _classes_and_id(element: Tag) -> List[str]:
 
 
 def _remove_hidden(soup: BeautifulSoup):
+    total_words = len(soup.get_text(' ').split()) or 1
     for element in soup.find_all(True):
         if element.decomposed:
             continue
         style = attr(element, 'style').replace(' ', '').lower()
-        if (element.has_attr('hidden') or element.get('aria-hidden') == 'true'
-                or 'display:none' in style or 'visibility:hidden' in style):
+        if element.has_attr('hidden') or 'display:none' in style or 'visibility:hidden' in style:
             element.decompose()
+        elif element.get('aria-hidden') == 'true':
+            # Paywall scripts mark the article body aria-hidden (the NYT does), so keep it if it's most of the text.
+            if len(element.get_text(' ').split()) / total_words < 0.4:
+                element.decompose()
 
 
 def _remove_junk(soup: BeautifulSoup):
