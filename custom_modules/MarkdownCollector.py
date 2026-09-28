@@ -46,6 +46,10 @@ class MarkdownCollector(Collector):
         self._filepath: str = list_filepath  
         self._to_do: List[str] = []
         self._data: Dict[str,ListItemDict] = {}
+        # The file as loaded. The list is usually a note someone keeps by hand, so it's
+        # rewritten by editing these lines in place rather than regenerated.
+        self._lines: List[str] = []
+        self._added: List[str] = []
         self._load_urls()
 
     def __len__(self):
@@ -59,6 +63,7 @@ class MarkdownCollector(Collector):
         except Exception as e:
             self.log_error(f"Could not load file. Skipping collecting articles. {e}")
             return
+        self._lines = lines
         
         existing_urls = set()
         for line in lines:
@@ -111,6 +116,7 @@ class MarkdownCollector(Collector):
         if url in self._to_do:
             return
         self._to_do.append(url)
+        self._added.append(url)
  
     def get_article_metadatas(self) -> List[ArticleMetadata]:
         """
@@ -122,6 +128,10 @@ class MarkdownCollector(Collector):
             if article is not None:
                 articles.append(article)
         return articles
+
+    def _status(self, url: str):
+        item = self._data.get(url)
+        return item['status'] if item is not None else ListItemStatus.TO_DO
 
     def used_articles_callback(self, usedArticles: List[ArticleMetadata]):
         """
@@ -136,18 +146,36 @@ class MarkdownCollector(Collector):
                 'status': ListItemStatus.DONE
             }
         self.log_info("rewriting markdown list file with new article statuses")
+        # Only to-do items change: used ones are ticked, ones that errored are ticked with the
+        # error. Headings, notes, order and anything unrecognised stay as they were.
         lines = []
-        with open(self._filepath, "w+") as file:
-            for url in self._to_do:
-                file.write(f"- [ ] {url}\n")
-            for url in self._data:
-                status = self._data[url].get('status', ListItemStatus.TO_DO)
-                if status == ListItemStatus.DONE:
-                    lines.append(f'- [x] {url}\n')
-                elif status == ListItemStatus.TO_DO:
-                    lines.append(f'- [ ] {url}\n')
-                else:
-                    lines.append(f'- [x] {url} ({status})\n')
-            lines.sort()
-            for line in lines:
-                file.write(line)
+        on_page = set()
+        for line in self._lines:
+            matches = re.search(MarkdownCollector.TO_DO_LIST_REGEX, line)
+            if matches is not None:
+                url = matches.group('url').strip()
+                on_page.add(url)
+                status = self._status(url)
+                if matches.group('status') == ' ' and status != ListItemStatus.TO_DO:
+                    ending = '\n' if line.endswith('\n') else ''
+                    line = line[:matches.start('status')] + 'x' + line[matches.end('status'):].rstrip('\n')
+                    if status != ListItemStatus.DONE:
+                        line += f' ({status})'
+                    line += ending
+            lines.append(line)
+        if lines and not lines[-1].endswith('\n'):
+            lines[-1] += '\n'
+        # URLs added with add() go at the end.
+        for url in self._added:
+            if url in on_page:
+                continue
+            on_page.add(url)
+            status = self._status(url)
+            if status == ListItemStatus.TO_DO:
+                lines.append(f'- [ ] {url}\n')
+            elif status == ListItemStatus.DONE:
+                lines.append(f'- [x] {url}\n')
+            else:
+                lines.append(f'- [x] {url} ({status})\n')
+        with open(self._filepath, "w") as file:
+            file.writelines(lines)
