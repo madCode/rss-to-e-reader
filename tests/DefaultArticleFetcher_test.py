@@ -7,6 +7,7 @@ from ArticleMetadata_mocks import MOCK_ARTICLE_METADATA_DO_NOT_FETCH, MOCK_ARTIC
 
 from base_classes.ArticleMetadata import ArticleMetadata
 from default_modules.DefaultArticleFetcher import DefaultArticleFetcher
+import default_modules.article_parser as article_parser
 from DefaultArticleFetcher_mocks import MOCK_GOOGLE_RESPONSE_CONTENT
 
 FIXTURE = open(os.path.join(os.path.dirname(__file__), 'fixtures', 'article_page.html'), encoding='utf-8').read()
@@ -68,8 +69,10 @@ class TestDefaultArticleFetcher(unittest.TestCase):
 
     def test_get_article_content_http_error_falls_back_to_feed_content(self):
         d = DefaultArticleFetcher([], error_log_callback=None, info_log_callback=None)
-        with patch.object(requests, 'get', return_value=create_response('Forbidden', status=403)):
+        with patch.object(requests, 'get', return_value=create_response('Forbidden', status=403)), \
+             patch.object(article_parser, 'impersonated_get', return_value=None) as impersonated:
             result = d._get_article_content(MOCK_ARTICLE_METADATA_FETCH)
+        impersonated.assert_called_once()
         self.assertFalse(result.success)
         self.assertEqual(result.content, '<p>CONTENTS</p>')
         self.assertIn('Could not fetch the full article', result.note)
@@ -120,3 +123,19 @@ class TestDefaultArticleFetcher(unittest.TestCase):
         self.assertEqual(_parse_date('2025-03-04T10:00:00Z'), date(2025, 3, 4))
         self.assertIsNone(_parse_date(''))
         self.assertIsNone(_parse_date('March 2025'))
+
+    def test_impersonation_can_be_turned_off(self):
+        d = DefaultArticleFetcher([], error_log_callback=None, info_log_callback=None, impersonate_browser=None)
+        with patch.object(requests, 'get', return_value=create_response('Forbidden', status=403)), \
+             patch.object(article_parser, 'impersonated_get') as impersonated:
+            self.assertFalse(d._get_article_content(metadata(content='')).success)
+        impersonated.assert_not_called()
+
+    def test_blocked_page_is_fetched_as_browser(self):
+        d = DefaultArticleFetcher([], info_log_callback=None, impersonate_browser='safari')
+        with patch.object(requests, 'get', return_value=create_response('<title>Just a moment...</title>', status=403)), \
+             patch.object(article_parser, 'impersonated_get', return_value=create_response(FIXTURE)) as impersonated:
+            result = d._get_article_content(metadata())
+        self.assertEqual(impersonated.call_args.args[:2], ('https://example.com/culture/slow', 'safari'))
+        self.assertTrue(result.success)
+        self.assertIn('particular pleasure in reading slowly', result.content)

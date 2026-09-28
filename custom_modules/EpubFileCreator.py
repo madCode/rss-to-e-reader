@@ -1,6 +1,7 @@
 from base_classes.file_creator import FileCreator
 from bs4 import BeautifulSoup  # type: ignore
 from datetime import date
+from default_modules.browser_impersonation import DEFAULT_IMPERSONATE
 from default_modules.DefaultArticle import DefaultArticle
 from default_modules.ebook_images import ProcessedImage, fetch_images
 from default_modules.ereader_css import EREADER_CSS
@@ -26,6 +27,7 @@ class EpubFileCreator(FileCreator):
         embed_images: bool = True, max_images_per_article: int = 20, max_total_image_bytes: int = 15 * 1024 * 1024,
         image_max_dimension: int = 1200, grayscale_images: bool = False, include_cover: bool = True,
         include_source_links: bool = True, image_timeout: float = 20, session: Optional[requests.Session] = None,
+        impersonate_browser: Optional[str] = DEFAULT_IMPERSONATE,
         error_log_callback: Optional[Callable] = print, info_log_callback: Optional[Callable] = print):
         """
         Parameters
@@ -60,6 +62,8 @@ class EpubFileCreator(FileCreator):
             Seconds to wait for each image download.
         session: requests.Session, optional
             Session to download images with.
+        impersonate_browser: str, optional
+            Browser to impersonate when an image server blocks the download (see DefaultArticleFetcher). None turns it off.
         """
         super().__init__(filestub, articles, error_log_callback, info_log_callback)
         self.title = title
@@ -74,6 +78,7 @@ class EpubFileCreator(FileCreator):
         self.include_source_links = include_source_links
         self.image_timeout = image_timeout
         self.session = session
+        self.impersonate_browser = impersonate_browser
         self.articles: Sequence[DefaultArticle] = articles
 
     @property
@@ -118,7 +123,8 @@ class EpubFileCreator(FileCreator):
             for referer, urls in by_referer.items():
                 fetched.update(fetch_images(
                     urls, referer=referer, max_dimension=self.image_max_dimension,
-                    grayscale=self.grayscale_images, timeout=self.image_timeout, session=self.session))
+                    grayscale=self.grayscale_images, timeout=self.image_timeout, session=self.session,
+                    impersonate=self.impersonate_browser))
 
         embedded: Dict[str, Tuple[str, ProcessedImage]] = {}
         total = 0
