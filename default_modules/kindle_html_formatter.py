@@ -176,13 +176,17 @@ def _classes_and_id(element: Tag) -> List[str]:
 
 
 def _remove_hidden(soup: BeautifulSoup):
+    total_words = len(soup.get_text(' ').split()) or 1
     for element in soup.find_all(True):
         if element.decomposed:
             continue
         style = attr(element, 'style').replace(' ', '').lower()
-        if (element.has_attr('hidden') or element.get('aria-hidden') == 'true'
-                or 'display:none' in style or 'visibility:hidden' in style):
+        if element.has_attr('hidden') or 'display:none' in style or 'visibility:hidden' in style:
             element.decompose()
+        elif element.get('aria-hidden') == 'true':
+            # Paywall scripts mark the article body aria-hidden (the NYT does), so keep it if it's most of the text.
+            if len(element.get_text(' ').split()) / total_words < 0.4:
+                element.decompose()
 
 
 def _remove_junk(soup: BeautifulSoup):

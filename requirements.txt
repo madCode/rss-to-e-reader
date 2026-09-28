@@ -5,3 +5,6 @@ coverage
 diff-cover
 unidecode
 mypy
+trafilatura>=1.8
+readability-lxml>=0.8.1
+lxml_html_clean
