@@ -1,4 +1,4 @@
-from typing import TypedDict, List, Optional, Any
+from typing import TypedDict, List, Optional, Any, Union
 
 class TtrssHeadline(TypedDict):
     id: int
@@ -10,7 +10,7 @@ class TtrssHeadline(TypedDict):
     is_updated: bool
     title: str
     link: str
-    feed_id: str
+    feed_id: Union[int, str]  # tt-rss sends an int
     tags: List[str]
     content: str
     labels: List[str]

@@ -3,7 +3,7 @@ from base_classes.collector import Collector
 import json
 import requests
 from custom_modules.ttrss_types import TtrssHeadline, TtrssResponse
-from typing import List, Dict, Optional, Union, Callable
+from typing import List, Dict, Optional, Sequence, Union, Callable
 
 class TtrssCollector(Collector):
     """
@@ -14,7 +14,7 @@ class TtrssCollector(Collector):
     def __init__(
         self, ttrss_api_url: str, user: str = "", password: str ="", max_num_articles: int = -1,
         fetch_feed_id: str = "-4", fetch_feed_is_category: bool = False, last_article_id: str = "",
-        fetch_from_url_source_id_list: List[str] = [],
+        fetch_from_url_source_id_list: Sequence[Union[str, int]] = [],
         error_log_callback: Optional[Callable] = print, info_log_callback: Optional[Callable] = print
         ):
         """
@@ -37,7 +37,8 @@ class TtrssCollector(Collector):
         last_article_id: str, optional
             if this provided, tell ttrss to send only articles created _after_ this article
         fetch_from_url_source_id_list: List[str], optional
-            if the source_id for the article is in this list, set fetch_content_from_url on the ArticleMetadata to true
+            if the source_id for the article is in this list, set fetch_content_from_url on the ArticleMetadata to true.
+            Feed ids can be given as strings or ints.
         error_log_callback: func, optional
             callback for error logs. Defaults to system print function.
         info_log_callback: func, optional
@@ -52,7 +53,8 @@ class TtrssCollector(Collector):
         self._is_cat = fetch_feed_is_category
         self._session_id: Optional[str] = None
         self._last_article_id = last_article_id
-        self._fetch_from_url_list = fetch_from_url_source_id_list
+        # tt-rss sends feed_id as an int, but source_id is a str and configs mix the two, so compare as strings.
+        self._fetch_from_url_list = {str(i) for i in fetch_from_url_source_id_list}
     
     def _send_ttrss_post_request(self, post_body: str) -> Union[TtrssResponse,Dict]:
         response = requests.post(self._api_url, data=post_body)
@@ -138,11 +140,12 @@ class TtrssCollector(Collector):
         i = 0
         total = len(headlines)
         for headline in headlines:
+            feed_id = str(headline['feed_id'])
             article = ArticleMetadata(
                 headline['title'], headline['link'],
-                headline['feed_id'], headline['content'],
+                feed_id, headline['content'],
                 headline['feed_title'], str(headline['id']),
-                fetch_content_from_url=(headline['feed_id'] in self._fetch_from_url_list)
+                fetch_content_from_url=(feed_id in self._fetch_from_url_list)
                 )
             articles.append(article)
             if i%10 == 0:

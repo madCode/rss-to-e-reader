@@ -111,6 +111,16 @@ class TestDefaultArticleFetcher(unittest.TestCase):
         d = DefaultArticleFetcher([], replace_table_source_ids=['source'], info_log_callback=None)
         self.assertNotIn('<table>', d._get_article_content(m).content)
 
+    def test_replace_table_source_ids_accepts_ints(self):
+        # Feed ids come from tt-rss as numbers, and configs list them as ints or strings
+        table = '<table><tr><td>a</td><td>b</td></tr><tr><td>c</td><td>d</td></tr></table>'
+        for source_id in ('193', 193):
+            with self.subTest(source_id=source_id):
+                m = ArticleMetadata('', 'https://example.com/a', source_id, table, 'Example feed', 'abc')  # type: ignore[arg-type]
+                m.fetch_content_from_url = False
+                d = DefaultArticleFetcher([], replace_table_source_ids=[193], info_log_callback=None)
+                self.assertNotIn('<table>', d._get_article_content(m).content)
+
     def test_non_article_page_does_not_crash(self):
         d = DefaultArticleFetcher([], info_log_callback=None)
         with patch.object(requests, 'get', return_value=create_response(MOCK_GOOGLE_RESPONSE_CONTENT)):
