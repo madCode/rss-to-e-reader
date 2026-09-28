@@ -1,5 +1,5 @@
 from datetime import date
-import os
+from pathlib import Path
 import unittest
 import requests
 from unittest.mock import patch
@@ -10,7 +10,7 @@ from default_modules.DefaultArticleFetcher import DefaultArticleFetcher
 import default_modules.article_parser as article_parser
 from DefaultArticleFetcher_mocks import MOCK_GOOGLE_RESPONSE_CONTENT
 
-FIXTURE = open(os.path.join(os.path.dirname(__file__), 'fixtures', 'article_page.html'), encoding='utf-8').read()
+FIXTURE = (Path(__file__).parent / 'fixtures' / 'article_page.html').read_text(encoding='utf-8')
 
 def create_response(content: str, url: str = 'https://www.google.com', status: int = 200) -> requests.Response:
     r = requests.Response()

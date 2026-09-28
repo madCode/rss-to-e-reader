@@ -1,6 +1,7 @@
 import os
 import tempfile
 import unittest
+from pathlib import Path
 
 from base_classes.ArticleMetadata import ArticleMetadata
 from custom_modules.HTMLFileCreator import HTMLFileCreator
@@ -13,7 +14,7 @@ class TestHTMLFileCreator(unittest.TestCase):
                     DefaultArticle(metas[1], display_content='<p>Two</p>')]
         with tempfile.TemporaryDirectory() as d:
             path = HTMLFileCreator(os.path.join(d, 'out'), articles, 'Title & co', info_log_callback=None).write_file()
-            html = open(path, encoding='utf-8').read()
+            html = Path(path).read_text(encoding='utf-8')
             self.assertIn('<meta charset="utf-8"/>', html)
             self.assertIn('<title>Title &amp; co</title>', html)
             self.assertIn('<a href="#article-0">Café &lt;0&gt;</a>', html)
@@ -22,4 +23,4 @@ class TestHTMLFileCreator(unittest.TestCase):
             self.assertIn('“Quoted” naïve', html)
 
             path = HTMLFileCreator(os.path.join(d, 'ascii'), articles, 'T', info_log_callback=None, ascii_only=True).write_file()
-            self.assertIn('"Quoted" naive', open(path, encoding='utf-8').read())
+            self.assertIn('"Quoted" naive', Path(path).read_text(encoding='utf-8'))
