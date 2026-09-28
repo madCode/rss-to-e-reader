@@ -1,0 +1,87 @@
+import os
+import smtplib
+import tempfile
+import unittest
+from unittest.mock import MagicMock, patch
+
+from custom_modules.FolderSender import FolderSender
+from default_modules.SmtpSender import SmtpSender, media_type_for
+
+class SenderTestCase(unittest.TestCase):
+    def setUp(self):
+        self.dir = tempfile.TemporaryDirectory()
+        self.path = os.path.join(self.dir.name, 'Daily Reading.epub')
+        with open(self.path, 'wb') as f:
+            f.write(b'EPUB DATA')
+
+    def tearDown(self):
+        self.dir.cleanup()
+
+class TestSmtpSender(SenderTestCase):
+    def test_media_types(self):
+        self.assertEqual(media_type_for('a.epub'), 'application/epub+zip')
+        self.assertEqual(media_type_for('a.HTML'), 'text/html')
+        self.assertEqual(media_type_for('a.unknownext'), 'application/octet-stream')
+
+    def test_build_message(self):
+        sender = SmtpSender(['a@kindle.com', 'b@kindle.com'], 'me@example.com', 'smtp.example.com', info_log_callback=None)
+        msg = sender.build_message(self.path)
+        self.assertEqual(msg['Subject'], 'Daily Reading')
+        self.assertEqual(msg['To'], 'a@kindle.com, b@kindle.com')
+        attachment = next(msg.iter_attachments())
+        self.assertEqual(attachment.get_content_type(), 'application/epub+zip')
+        self.assertEqual(attachment.get_filename(), 'Daily Reading.epub')
+        self.assertEqual(attachment.get_content(), b'EPUB DATA')
+
+    def test_send_ssl(self):
+        server = MagicMock()
+        with patch.object(smtplib, 'SMTP_SSL', return_value=server) as smtp_ssl:
+            sent = SmtpSender.gmail('me@gmail.com', 'abcd efgh ijkl mnop', 'me@kindle.com', info_log_callback=None).send(self.path, 'Hi')
+        self.assertTrue(sent)
+        self.assertEqual(smtp_ssl.call_args.args, ('smtp.gmail.com', 465))
+        server.__enter__.return_value.login.assert_called_once_with('me@gmail.com', 'abcdefghijklmnop')
+        server.__enter__.return_value.send_message.assert_called_once()
+
+    def test_send_starttls_and_failure(self):
+        server = MagicMock()
+        with patch.object(smtplib, 'SMTP', return_value=server):
+            sender = SmtpSender('me@kindle.com', 'me@example.com', 'smtp.example.com', 587, 'key', username='apikey',
+                                security='starttls', info_log_callback=None)
+            self.assertTrue(sender.send(self.path))
+        server.starttls.assert_called_once()
+        server.__enter__.return_value.login.assert_called_once_with('apikey', 'key')
+
+        errors = []
+        with patch.object(smtplib, 'SMTP_SSL', side_effect=OSError('refused')):
+            sender = SmtpSender('me@kindle.com', 'me@example.com', 'smtp.example.com', error_log_callback=errors.append)
+            self.assertFalse(sender.send(self.path))
+        self.assertIn('refused', errors[0])
+
+    def test_size_limit(self):
+        with open(self.path, 'wb') as f:
+            f.write(os.urandom(1024 * 1024))  # encodes to about 1.35MB
+        self.assertEqual(SmtpSender.gmail('me@gmail.com', 'pw', 'me@kindle.com').max_email_mb, 25)
+        self.assertEqual(SmtpSender('me@kindle.com', 'me@example.com', 'smtp.example.com').max_email_mb, 50)
+        errors = []
+        with patch.object(smtplib, 'SMTP_SSL') as smtp_ssl:
+            sender = SmtpSender('me@kindle.com', 'me@example.com', 'smtp.example.com', max_email_mb=1, error_log_callback=errors.append)
+            self.assertFalse(sender.send(self.path))
+        smtp_ssl.assert_not_called()
+        self.assertIn('over the 1MB limit', errors[0])
+        with patch.object(smtplib, 'SMTP_SSL', return_value=MagicMock()):
+            self.assertTrue(SmtpSender('me@kindle.com', 'me@example.com', 'smtp.example.com', max_email_mb=2, info_log_callback=None).send(self.path))
+
+    def test_invalid_security(self):
+        self.assertRaises(ValueError, SmtpSender, 'a', 'b', 'c', security='tls')
+
+class TestFolderSender(SenderTestCase):
+    def test_copies_and_prunes(self):
+        folder = os.path.join(self.dir.name, 'sync', 'kobo')
+        sender = FolderSender(folder, keep_last=2, info_log_callback=None)
+        for i in range(3):
+            path = os.path.join(self.dir.name, f'{i}.epub')
+            with open(path, 'wb') as f:
+                f.write(b'x')
+            os.utime(path, (1000 + i, 1000 + i))
+            self.assertTrue(sender.send(path))
+        self.assertEqual(sorted(os.listdir(folder)), ['1.epub', '2.epub'])
