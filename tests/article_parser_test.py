@@ -1,5 +1,5 @@
 import json
-import os
+from pathlib import Path
 import unittest
 from unittest.mock import patch
 
@@ -8,7 +8,7 @@ import requests
 import default_modules.article_parser as article_parser
 from default_modules.article_parser import clean_title, extract_article, fetch_html, find_site_rule, select_rule, title_from_url
 
-FIXTURE = open(os.path.join(os.path.dirname(__file__), 'fixtures', 'article_page.html'), encoding='utf-8').read()
+FIXTURE = (Path(__file__).parent / 'fixtures' / 'article_page.html').read_text(encoding='utf-8')
 LONG_TEXT = ' '.join(['word'] * 300)
 
 class TestArticleParser(unittest.TestCase):
