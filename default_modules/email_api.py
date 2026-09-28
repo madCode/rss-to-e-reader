@@ -1,5 +1,5 @@
 """
-Kept for backwards compatibility. New code should use a Sender: SmtpSender, ResendSender or FolderSender.
+Kept for backwards compatibility. New code should use a Sender: SmtpSender or FolderSender.
 """
 from default_modules.SmtpSender import SmtpSender
 from typing import List, Union

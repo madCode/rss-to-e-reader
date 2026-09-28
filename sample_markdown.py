@@ -30,7 +30,5 @@ path = file_creator.write_file() #5
 # optional: send the file to your e-reader. Pick one:
 # from default_modules.SmtpSender import SmtpSender
 # SmtpSender.gmail("you@gmail.com", "your app password", "you@kindle.com").send(path)
-# import os; from custom_modules.ResendSender import ResendSender
-# ResendSender(os.environ["RESEND_API_KEY"], "kindle@yourdomain.com", "you@kindle.com").send(path)
 # from custom_modules.FolderSender import FolderSender
 # FolderSender("/path/to/Dropbox/Apps/Rakuten Kobo").send(path)

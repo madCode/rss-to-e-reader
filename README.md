@@ -11,8 +11,7 @@ Article-to-e-Reader is a modular open source python library that allows you to s
 
 ## Delivering to your e-reader
 Senders take the file a FileCreator wrote and get it onto your device:
-- **ResendSender** emails the file through [Resend](https://resend.com)'s HTTP API. It needs only an API key: no SMTP, OAuth or app passwords, and it works from hosts that block SMTP ports. You need a domain you own (verified in Resend) to send from. The free tier is plenty for a daily digest.
-- **SmtpSender** emails the file through any SMTP server. `SmtpSender.gmail(...)` works with a Gmail [App Password](https://myaccount.google.com/apppasswords), which requires 2-Step Verification (Google no longer accepts your normal password from scripts, and some Workspace admins turn App Passwords off). Fastmail, iCloud and the SMTP relays of Resend, Brevo, Postmark, Mailgun and SendGrid work too.
+- **SmtpSender** emails the file through any SMTP server. `SmtpSender.gmail(...)` works with a Gmail [App Password](https://myaccount.google.com/apppasswords), which requires 2-Step Verification (Google no longer accepts your normal password from scripts, and some Workspace admins turn App Passwords off). Fastmail, iCloud and other providers work too, with their SMTP settings.
 - **FolderSender** copies the file into a folder your device syncs: Kobo's Dropbox/Google Drive integration, a Syncthing folder for KOReader, or Calibre's auto-add folder.
 
 For Send to Kindle, add the address you send from to the *Approved Personal Document E-mail List* at amazon.com/myk (Preferences → Personal Document Settings) and send to your device's `@kindle.com` address. Emails over 50MB are rejected (Gmail's own limit is 25MB); EpubFileCreator keeps embedded images under 15MB by default.

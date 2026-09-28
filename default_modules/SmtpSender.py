@@ -31,8 +31,7 @@ amazon.com/myk (Preferences -> Personal Document Settings) and send to your devi
 Works with:
 - Gmail: needs 2-Step Verification and an App Password (myaccount.google.com/apppasswords). See SmtpSender.gmail().
 - Fastmail, iCloud, Outlook/Proton (via Bridge), ...: use the provider's SMTP settings and an app-specific password.
-- Transactional email services (Resend, Brevo, Postmark, Mailgun, SendGrid...), which all offer SMTP relays with
-  API-key logins. See also ResendSender, which uses Resend's HTTP API when SMTP ports are blocked.
+- Transactional email services (Brevo, Postmark, Mailgun, SendGrid...), which offer SMTP relays with API-key logins.
 """
 class SmtpSender(Sender):
     def __init__(
@@ -47,13 +46,13 @@ class SmtpSender(Sender):
         from_email: str
             The address the email comes from. Must be on your Kindle's approved sender list.
         smtp_host: str
-            e.g. smtp.gmail.com, smtp.fastmail.com, smtp.resend.com
+            e.g. smtp.gmail.com, smtp.fastmail.com
         smtp_port: int, optional
             Defaults to 465 (implicit TLS). Use 587 with security="starttls".
         password: str, optional
             SMTP password, app password or API key.
         username: str, optional
-            SMTP username if it differs from from_email (e.g. "resend" or "apikey").
+            SMTP username if it differs from from_email (e.g. "apikey").
         security: str, optional
             "ssl" (implicit TLS, usually port 465), "starttls" (usually port 587) or "none". Defaults to "ssl".
         timeout: float, optional
@@ -76,7 +75,7 @@ class SmtpSender(Sender):
         """
         Sends through Gmail. Google no longer accepts your normal password from scripts: turn on
         2-Step Verification, then create an App Password at https://myaccount.google.com/apppasswords.
-        (Some Google Workspace admins disable App Passwords; use another provider or ResendSender then.)
+        (Some Google Workspace admins disable App Passwords; use another provider then.)
         """
         return cls(to_emails, gmail_address, 'smtp.gmail.com', 465, app_password.replace(' ', ''), **kwargs)
 

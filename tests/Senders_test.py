@@ -1,14 +1,10 @@
-import base64
 import os
 import smtplib
 import tempfile
 import unittest
 from unittest.mock import MagicMock, patch
 
-import requests
-
 from custom_modules.FolderSender import FolderSender
-from custom_modules.ResendSender import ResendSender
 from default_modules.SmtpSender import SmtpSender, media_type_for
 from default_modules.email_api import default_send_file_in_email
 
@@ -69,28 +65,6 @@ class TestSmtpSender(SenderTestCase):
         with patch.object(SmtpSender, 'send', return_value=True) as send:
             self.assertTrue(default_send_file_in_email('me@kindle.com', self.path[:-5], 'me@x.com', 'smtp.x.com', 465, 'pw', ['1', '2'], '.epub'))
         self.assertEqual(send.call_args.args[0], self.path)
-
-class TestResendSender(SenderTestCase):
-    def test_send(self):
-        response = requests.Response()
-        response.status_code = 200
-        response._content = b'{"id": "abc"}'
-        with patch.object(requests, 'post', return_value=response) as post:
-            self.assertTrue(ResendSender('re_key', 'kindle@me.com', 'me@kindle.com', info_log_callback=None).send(self.path))
-        self.assertEqual(post.call_args.kwargs['headers'], {'Authorization': 'Bearer re_key'})
-        payload = post.call_args.kwargs['json']
-        self.assertEqual(payload['to'], ['me@kindle.com'])
-        self.assertEqual(payload['subject'], 'Daily Reading')
-        self.assertEqual(payload['attachments'], [{'filename': 'Daily Reading.epub', 'content': base64.b64encode(b'EPUB DATA').decode()}])
-
-    def test_api_error(self):
-        response = requests.Response()
-        response.status_code = 422
-        response._content = b'{"message": "domain not verified"}'
-        errors = []
-        with patch.object(requests, 'post', return_value=response):
-            self.assertFalse(ResendSender('re_key', 'kindle@me.com', 'me@kindle.com', error_log_callback=errors.append).send(self.path))
-        self.assertIn('domain not verified', errors[0])
 
 class TestFolderSender(SenderTestCase):
     def test_copies_and_prunes(self):
