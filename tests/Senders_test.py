@@ -58,6 +58,20 @@ class TestSmtpSender(SenderTestCase):
             self.assertFalse(sender.send(self.path))
         self.assertIn('refused', errors[0])
 
+    def test_size_limit(self):
+        with open(self.path, 'wb') as f:
+            f.write(os.urandom(1024 * 1024))  # encodes to about 1.35MB
+        self.assertEqual(SmtpSender.gmail('me@gmail.com', 'pw', 'me@kindle.com').max_email_mb, 25)
+        self.assertEqual(SmtpSender('me@kindle.com', 'me@example.com', 'smtp.example.com').max_email_mb, 50)
+        errors = []
+        with patch.object(smtplib, 'SMTP_SSL') as smtp_ssl:
+            sender = SmtpSender('me@kindle.com', 'me@example.com', 'smtp.example.com', max_email_mb=1, error_log_callback=errors.append)
+            self.assertFalse(sender.send(self.path))
+        smtp_ssl.assert_not_called()
+        self.assertIn('over the 1MB limit', errors[0])
+        with patch.object(smtplib, 'SMTP_SSL', return_value=MagicMock()):
+            self.assertTrue(SmtpSender('me@kindle.com', 'me@example.com', 'smtp.example.com', max_email_mb=2, info_log_callback=None).send(self.path))
+
     def test_invalid_security(self):
         self.assertRaises(ValueError, SmtpSender, 'a', 'b', 'c', security='tls')
 

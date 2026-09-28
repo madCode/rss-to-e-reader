@@ -14,7 +14,7 @@ Senders take the file a FileCreator wrote and get it onto your device:
 - **SmtpSender** emails the file through any SMTP server. `SmtpSender.gmail(...)` works with a Gmail [App Password](https://myaccount.google.com/apppasswords), which requires 2-Step Verification (Google no longer accepts your normal password from scripts, and some Workspace admins turn App Passwords off). Fastmail, iCloud and other providers work too, with their SMTP settings.
 - **FolderSender** copies the file into a folder your device syncs: Kobo's Dropbox/Google Drive integration, a Syncthing folder for KOReader, or Calibre's auto-add folder.
 
-For Send to Kindle, add the address you send from to the *Approved Personal Document E-mail List* at amazon.com/myk (Preferences → Personal Document Settings) and send to your device's `@kindle.com` address. Emails over 50MB are rejected (Gmail's own limit is 25MB); EpubFileCreator keeps embedded images under 15MB by default.
+For Send to Kindle, add the address you send from to the *Approved Personal Document E-mail List* at amazon.com/myk (Preferences → Personal Document Settings) and send to your device's `@kindle.com` address. Emails over 50MB are rejected (Gmail's own limit is 25MB, which `SmtpSender.gmail()` checks for; pass `max_email_mb` to change it). EpubFileCreator keeps embedded images under 15MB by default.
 
 ## How articles are extracted
 DefaultArticleFetcher downloads each article (several at a time) and runs an extraction pipeline (`default_modules/article_parser.py`):

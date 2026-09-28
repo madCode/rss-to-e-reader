@@ -6,8 +6,9 @@ import smtplib
 import ssl
 from typing import Callable, List, Optional, Union
 
-# Amazon rejects Send to Kindle emails over 50MB. Many providers' limits are lower (Gmail: 25MB).
-KINDLE_EMAIL_LIMIT_BYTES = 50 * 1024 * 1024
+# Amazon rejects Send to Kindle emails over 50MB. Many providers' limits are lower; SmtpSender.gmail() uses Gmail's.
+KINDLE_EMAIL_LIMIT_MB = 50
+GMAIL_LIMIT_MB = 25
 
 MEDIA_TYPES = {
     '.epub': 'application/epub+zip',
@@ -37,7 +38,7 @@ class SmtpSender(Sender):
     def __init__(
         self, to_emails: Union[str, List[str]], from_email: str, smtp_host: str, smtp_port: int = 465,
         password: str = "", username: Optional[str] = None, security: str = "ssl", timeout: float = 60,
-        error_log_callback: Optional[Callable] = print, info_log_callback: Optional[Callable] = print):
+        max_email_mb: float = KINDLE_EMAIL_LIMIT_MB, error_log_callback: Optional[Callable] = print, info_log_callback: Optional[Callable] = print):
         """
         Parameters
         ----------
@@ -57,6 +58,10 @@ class SmtpSender(Sender):
             "ssl" (implicit TLS, usually port 465), "starttls" (usually port 587) or "none". Defaults to "ssl".
         timeout: float, optional
             Seconds to wait on the SMTP server. Defaults to 60.
+        max_email_mb: float, optional
+            The largest email your provider and Send to Kindle accept. Larger emails are logged as an error and not
+            sent. Attachments grow by about a third when encoded, so a 20MB file makes a 27MB email. Defaults to 50
+            (Send to Kindle's limit); SmtpSender.gmail() uses 25 (Gmail's).
         """
         super().__init__(error_log_callback, info_log_callback)
         if security not in ("ssl", "starttls", "none"):
@@ -69,6 +74,7 @@ class SmtpSender(Sender):
         self.username = username if username is not None else from_email
         self.security = security
         self.timeout = timeout
+        self.max_email_mb = max_email_mb
 
     @classmethod
     def gmail(cls, gmail_address: str, app_password: str, to_emails: Union[str, List[str]], **kwargs) -> 'SmtpSender':
@@ -77,6 +83,7 @@ class SmtpSender(Sender):
         2-Step Verification, then create an App Password at https://myaccount.google.com/apppasswords.
         (Some Google Workspace admins disable App Passwords; use another provider then.)
         """
+        kwargs.setdefault('max_email_mb', GMAIL_LIMIT_MB)
         return cls(to_emails, gmail_address, 'smtp.gmail.com', 465, app_password.replace(' ', ''), **kwargs)
 
     def build_message(self, filepath: str, subject: str = "", body: str = "") -> EmailMessage:
@@ -102,10 +109,11 @@ class SmtpSender(Sender):
 
     def send(self, filepath: str, subject: str = "", body: str = "") -> bool:
         try:
-            size = os.path.getsize(filepath)
-            if size > KINDLE_EMAIL_LIMIT_BYTES:
-                self.log_error(f'{filepath} is {size // (1024 * 1024)}MB; Send to Kindle rejects emails over 50MB.')
             msg = self.build_message(filepath, subject, body)
+            size_mb = len(msg.as_bytes()) / (1024 * 1024)
+            if size_mb > self.max_email_mb:
+                self.log_error(f'Not sending {filepath}: the email would be {size_mb:.0f}MB, over the {self.max_email_mb:g}MB limit.')
+                return False
             with self._connect() as server:
                 if self.password:
                     server.login(self.username, self.password)
