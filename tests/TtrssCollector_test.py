@@ -1,5 +1,6 @@
 from custom_modules.TtrssCollector import TtrssCollector
 from TtrssCollector_mocks import MOCK_HEADLINE
+import json
 import unittest
 import unittest.mock as mock
 
@@ -177,9 +178,10 @@ class TestTtrssCollector(unittest.TestCase):
         inst = TtrssCollector("testurl")
         inst._session_id="987"
         inst._send_ttrss_post_request = mock.MagicMock(return_value={})
-        self.assertRaisesRegex(RuntimeError,
-            'Unable to get headline data from tt-rss api. Called with: {"sid":"987","op":"getHeadlines","feed_id":"-4","view_mode":"unread","show_content":"1"}',
-            inst._get_articles_from_ttrss)
+        with self.assertRaisesRegex(RuntimeError, 'Unable to get headline data from tt-rss api') as ctx:
+            inst._get_articles_from_ttrss()
+        # The request carries the session id; the error must not.
+        self.assertNotIn("987", str(ctx.exception))
     
     def test_get_article_metadatas_successful_logout(self):
         # Assert that results from get_articles_from_ttrss make ArticleMetadata correctly
@@ -270,3 +272,37 @@ class TestTtrssCollector(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class TestTtrssRequests(unittest.TestCase):
+    """What goes over the wire and into the logs. Logs are often kept
+    (a cron log, say), and the login request carries the password."""
+
+    def response(self, status, body=b'{}'):
+        resp = mock.Mock()
+        resp.status_code = status
+        resp.content = body
+        return resp
+
+    def test_http_error_log_names_the_operation_not_the_request(self):
+        errors = []
+        inst = TtrssCollector("testurl", "USER", "PASSWORD-123", error_log_callback=errors.append)
+        with mock.patch("custom_modules.TtrssCollector.requests.post", return_value=self.response(502)):
+            with self.assertRaises(RuntimeError):
+                inst._login()
+        self.assertEqual(len(errors), 1)
+        self.assertIn("login", errors[0])
+        self.assertIn("502", errors[0])
+        self.assertNotIn("PASSWORD-123", errors[0])
+
+    def test_quote_in_password_is_escaped(self):
+        inst = TtrssCollector("testurl", "USER", 'pa"ss')
+        sent = {}
+
+        def post(url, data):
+            sent["body"] = data
+            return self.response(200, b'{"content":{"session_id":"1"}}')
+        with mock.patch("custom_modules.TtrssCollector.requests.post", side_effect=post):
+            inst._login()
+        self.assertEqual(json.loads(sent["body"]), {"op": "login", "user": "USER", "password": 'pa"ss'})
+
