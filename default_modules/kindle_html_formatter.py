@@ -71,6 +71,22 @@ BOILERPLATE_MAX_WORDS = 12
 PREFERRED_IMAGE_WIDTH = 1000
 LAYOUT_TABLE_CELL_WORDS = 80
 _HTML_TAG_PATTERN = re.compile(r'<\s*[a-zA-Z!/]')
+SCREEN_READER_ONLY: Set[str] = {
+    'screen-reader-text', 'screen-reader-only', 'sr-only', 'sr-text', 'visually-hidden', 'visuallyhidden', 'a11y-hidden',
+}
+SCREEN_READER_MAX_WORDS = 12
+_RELATED_HEADING = re.compile(
+    r'(recommended|related)( (stories|articles|reading|content|coverage|posts))?|more (on|from) .{1,40}|'
+    r'read (more|next)|you (may|might) also like|most (read|popular)|further reading',
+    re.IGNORECASE,
+)
+# Headings no article gives its own section: trafilatura drops the box of links under one but can
+# leave the heading behind, over the article's next paragraphs.
+_FURNITURE_HEADING = re.compile(
+    r'recommended( (stories|articles|reading|for you))?|read next|you (may|might) also like|most (read|popular)',
+    re.IGNORECASE,
+)
+_LINK_TEXT_SHARE = 0.8
 _WHITESPACE = re.compile(r'\s+')
 # Characters that mean the "url" is really mangled markup, not something worth percent-encoding.
 _MANGLED_URL_CHARACTERS = re.compile(r'["\\<>]')
@@ -131,7 +147,9 @@ def clean_html(
     for element in soup.find_all(list(REMOVE_TAGS - {'source'})):
         element.decompose()
     _remove_hidden(soup)
+    remove_screen_reader_only(soup)
     _remove_junk(soup)
+    _remove_related_links(soup)
     _remove_boilerplate(soup)
     _fix_pictures(soup)
     _fix_images(soup, base_url, keep_images)
@@ -171,6 +189,69 @@ def _remove_hidden(soup: BeautifulSoup):
             # Paywall scripts mark the article body aria-hidden (the NYT does), so keep it if it's most of the text.
             if len(element.get_text(' ').split()) / total_words < 0.4:
                 element.decompose()
+
+
+def remove_screen_reader_only(soup: BeautifulSoup) -> bool:
+    """
+    Removes text meant only for screen readers ("list 1 of 4", "Skip to content"), which sites hide
+    with CSS an e-reader doesn't have. Extractors drop class names, so article_parser calls this before
+    extracting. It goes by length, not share of the page: before extraction the page still includes
+    navigation and comments, and some paywalls put the article body in one of these classes.
+    Returns whether anything was removed.
+    """
+    removed = False
+    for element in soup.find_all(True):
+        if element.decomposed:
+            continue
+        classes = {c.lower() for c in attr(element, 'class').split()}
+        if (classes & SCREEN_READER_ONLY and len(element.get_text(' ').split()) <= SCREEN_READER_MAX_WORDS
+                and element.find('img') is None):
+            element.decompose()
+            removed = True
+    return removed
+
+
+def _is_link_list(element: Tag) -> bool:
+    """A list whose items are all, or nearly all, link text."""
+    if not isinstance(element, Tag) or element.name not in ('ul', 'ol'):
+        return False
+    items = element.find_all('li', recursive=False)
+    if not items:
+        return False
+    for li in items:
+        text = li.get_text()
+        if not text.strip() or len(''.join(a.get_text() for a in li.find_all('a'))) < _LINK_TEXT_SHARE * len(text):
+            return False
+    return True
+
+
+def _remove_related_links(soup: BeautifulSoup):
+    """
+    Removes a "Recommended stories" style list of links. Extractors often flatten the box that held
+    it, so this goes by the heading and the list after it rather than a class. A heading like that
+    over the article's own paragraphs, or over a list long enough to be the article's own reading
+    list, stays.
+    """
+    total_words = len(soup.get_text(' ').split()) or 1
+
+    def small(element: Tag) -> bool:
+        return len(element.get_text(' ').split()) / total_words < 0.4
+
+    for heading in soup.find_all(['h2', 'h3', 'h4', 'h5', 'h6']):
+        if heading.decomposed or not _RELATED_HEADING.fullmatch(heading.get_text().strip()):
+            continue
+        box = heading.parent
+        siblings = [c for c in box.children if isinstance(c, Tag)] if isinstance(box, Tag) else []
+        if (box is not None and box.name not in ('[document]', 'body') and siblings and siblings[0] is heading
+                and len(siblings) > 1 and all(_is_link_list(c) for c in siblings[1:]) and small(box)):
+            box.decompose()
+            continue
+        following = heading.find_next_sibling()
+        if following is not None and _is_link_list(following) and small(following):
+            following.decompose()
+            heading.decompose()
+        elif _FURNITURE_HEADING.fullmatch(heading.get_text().strip()):
+            heading.decompose()
 
 
 def _remove_junk(soup: BeautifulSoup):
