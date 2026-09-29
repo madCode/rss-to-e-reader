@@ -72,11 +72,63 @@ class TestMarkdownCollector(unittest.TestCase):
         c.used_articles_callback(metas[:1])
         with open(self.path) as f:
             lines = f.read().splitlines()
+        # Edited in place: the used item (both copies) is ticked, everything else keeps its text
+        # and position, and the added URL goes at the end.
         self.assertEqual(lines, [
-            '- [ ] https://example.com/later',
-            '- [ ] https://example.com/two',
-            '- [x] https://example.com/done',
-            '- [x] https://example.com/odd (status not recognized)',
+            '# Reading list',
             '- [x] https://example.com/one',
+            '- [x] https://example.com/done',
+            '- [ ] https://example.com/two',
+            '- [x] https://example.com/one',
+            'not a list item',
+            '- [\t] https://example.com/odd',
+            '- [ ] https://example.com/later',
         ])
         self.assertEqual(c._data['https://example.com/one']['status'], ListItemStatus.DONE)
+
+    def read(self) -> str:
+        with open(self.path) as f:
+            return f.read()
+
+    def test_callback_without_consuming_changes_nothing(self):
+        # What the link scrapers do: load, add nothing new, write back. Every unread URL used
+        # to come back twice, and the heading and notes were dropped.
+        self.collector().used_articles_callback([])
+        self.assertEqual(self.read(), LIST)
+
+    def test_adding_keeps_the_rest_of_the_note(self):
+        c = self.collector()
+        c.add('https://example.com/new')
+        c.add('https://example.com/one')  # already on the list
+        c.used_articles_callback([])
+        self.assertEqual(self.read(), LIST + '- [ ] https://example.com/new\n')
+
+    def test_rewriting_twice_is_stable(self):
+        c = self.collector()
+        c.used_articles_callback(c.get_article_metadatas()[:1])
+        once = self.read()
+        c = self.collector()
+        c.used_articles_callback([])
+        self.assertEqual(self.read(), once)
+
+    def test_added_and_used_in_one_run_is_ticked(self):
+        c = self.collector()
+        c.add('https://example.com/new')
+        metas = c.get_article_metadatas()
+        c.used_articles_callback([m for m in metas if m.url == 'https://example.com/new'])
+        lines = self.read().splitlines()
+        self.assertEqual(lines[-1], '- [x] https://example.com/new')
+        self.assertIn('- [ ] https://example.com/two', lines)
+
+    def test_blank_lines_indentation_and_missing_final_newline(self):
+        with open(self.path, 'w') as f:
+            f.write('Intro\n\n  - [ ] https://example.com/a\n- [ ] https://example.com/b')
+        c = self.collector()
+        c.used_articles_callback([m for m in c.get_article_metadatas() if m.url.endswith('/a')])
+        self.assertEqual(self.read(), 'Intro\n\n  - [x] https://example.com/a\n- [ ] https://example.com/b\n')
+
+    def test_errored_item_is_ticked_with_the_reason(self):
+        c = self.collector()
+        c._data['https://example.com/two'] = {'url': 'https://example.com/two', 'status': 'error boom'}
+        c.used_articles_callback([])
+        self.assertIn('- [x] https://example.com/two (error boom)', self.read().splitlines())
