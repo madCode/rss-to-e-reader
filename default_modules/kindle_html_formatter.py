@@ -144,6 +144,7 @@ def clean_html(
     _normalize_headings(soup)
     _remove_empty(soup)
     _collapse_blank_lines(soup)
+    _demote_stray_captions(soup)
     return str(soup).strip()
 
 
@@ -411,3 +412,21 @@ def _collapse_blank_lines(soup: BeautifulSoup):
     for text in soup.find_all(string=True):
         if isinstance(text, NavigableString) and '\n' in text and not text.strip() and text.find_parent('pre') is None:
             text.replace_with('\n')
+
+
+def _demote_stray_captions(soup: BeautifulSoup):
+    """
+    A figcaption is only valid as the first or last child of a figure, and one per figure;
+    epubcheck rejects the book otherwise, and Send to Kindle can too. Sites nest captions in
+    layout divs, which unwrapping can't always fix, so a caption anywhere else becomes a div.
+    """
+    for caption in soup.find_all('figcaption'):
+        figure = caption.parent
+        valid = False
+        if isinstance(figure, Tag) and figure.name == 'figure':
+            # Nodes, not tags: a credit span unwrapped to bare text beside the caption counts too.
+            content = [c for c in figure.contents if not (isinstance(c, NavigableString) and not c.strip())]
+            captions = figure.find_all('figcaption', recursive=False)
+            valid = len(captions) == 1 and (caption is content[0] or caption is content[-1])
+        if not valid:
+            caption.name = 'div'
