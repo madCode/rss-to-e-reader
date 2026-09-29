@@ -2,6 +2,7 @@ from custom_modules.TtrssCollector import TtrssCollector
 from TtrssCollector_mocks import MOCK_HEADLINE
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import json
+import os
 import threading
 import unittest
 import unittest.mock as mock
@@ -318,8 +319,13 @@ class TestTtrssRequests(unittest.TestCase):
         redirecting = HTTPServer(('127.0.0.1', 0), Redirecting)
         for server in (elsewhere, redirecting):
             threading.Thread(target=server.serve_forever, daemon=True).start()
-            self.addCleanup(server.shutdown)
             self.addCleanup(server.server_close)
+            self.addCleanup(server.shutdown)
+        # A proxy from the environment would otherwise get these local requests.
+        no_proxy = os.environ.get('NO_PROXY', '')
+        env = mock.patch.dict(os.environ, {'NO_PROXY': f'{no_proxy},127.0.0.1', 'no_proxy': f'{no_proxy},127.0.0.1'})
+        env.start()
+        self.addCleanup(env.stop)
 
         errors = []
         inst = TtrssCollector(f'http://127.0.0.1:{redirecting.server_port}/api/', "USER", "PASSWORD-123",
@@ -329,6 +335,16 @@ class TestTtrssRequests(unittest.TestCase):
 
         self.assertEqual(received, [])
         self.assertIn(target, errors[0])
+
+    def test_a_relative_redirect_is_reported_as_a_full_url(self):
+        errors = []
+        inst = TtrssCollector("https://rss.example.com/api/", error_log_callback=errors.append)
+        resp = self.response(308)
+        resp.is_redirect = True
+        resp.headers = {'Location': '/tt-rss/api/'}
+        with mock.patch("custom_modules.TtrssCollector.requests.post", return_value=resp):
+            self.assertEqual(inst._send_ttrss_post_request('{"op":"login"}'), {})
+        self.assertIn("https://rss.example.com/tt-rss/api/", errors[0])
         self.assertNotIn("PASSWORD-123", errors[0])
 
     def test_http_error_log_names_the_operation_not_the_request(self):
