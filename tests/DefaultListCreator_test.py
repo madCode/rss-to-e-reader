@@ -194,12 +194,13 @@ class TestDefaultListCreator(unittest.TestCase):
         ttrss = self._collector(feed_copy)
         reading_list = self._collector(saved_copy, other)
 
-        inst = DefaultListCreator([ttrss, reading_list], article_order=ArticleOrder.IN_ORDER)
+        inst = DefaultListCreator([ttrss, reading_list], article_order=ArticleOrder.IN_ORDER, skip_duplicate_urls=True)
         articles = inst.get_article_metadatas()
 
         self.assertEqual(articles, [feed_copy, other])
         ttrss.used_articles_callback.assert_called_with([feed_copy])
         reading_list.used_articles_callback.assert_called_with([other, saved_copy])
+        self.assertEqual(inst.used_article_metadatas(articles), [feed_copy, other, saved_copy])
 
     def test_a_duplicate_whose_kept_copy_is_left_out_is_not_marked_used(self):
         first = ArticleMetadata("First", "https://example.com/a", "S")
@@ -207,17 +208,35 @@ class TestDefaultListCreator(unittest.TestCase):
         later = ArticleMetadata("Later", "https://example.com/b", "S")
         one = self._collector(later, first)
         two = self._collector(dup)
-        inst = DefaultListCreator([one, two], article_order=ArticleOrder.IN_ORDER, max_num_articles=1)
+        inst = DefaultListCreator([one, two], article_order=ArticleOrder.IN_ORDER, max_num_articles=1,
+                                  skip_duplicate_urls=True)
 
         self.assertEqual(inst.get_article_metadatas(), [later])
         two.used_articles_callback.assert_called_with([])
 
-    def test_duplicates_can_be_kept(self):
+    def test_duplicates_are_kept_unless_asked(self):
         a = ArticleMetadata("A", "https://example.com/a", "S")
         b = ArticleMetadata("B", "https://example.com/a", "T")
-        inst = DefaultListCreator([self._collector(a), self._collector(b)], article_order=ArticleOrder.IN_ORDER,
-                                  skip_duplicate_urls=False)
+        inst = DefaultListCreator([self._collector(a), self._collector(b)], article_order=ArticleOrder.IN_ORDER)
         self.assertEqual(inst.get_article_metadatas(), [a, b])
+
+    def test_a_copy_over_its_source_cap_is_still_marked_used(self):
+        kept = ArticleMetadata("Kept", "https://example.com/a", "FEED")
+        first_saved = ArticleMetadata("Saved first", "https://example.com/b", "LIST")
+        over_cap = ArticleMetadata("Saved copy", "https://example.com/a", "LIST")
+        feed = self._collector(kept)
+        saved = self._collector(first_saved, over_cap)
+        inst = DefaultListCreator([feed, saved], article_order=ArticleOrder.IN_ORDER, max_per_source_id=1,
+                                  skip_duplicate_urls=True)
+        inst.get_article_metadatas()
+        saved.used_articles_callback.assert_called_with([first_saved, over_cap])
+
+    def test_hash_routes_are_different_pages(self):
+        one = ArticleMetadata("One", "https://app.example/#/post/1", "S")
+        two = ArticleMetadata("Two", "https://app.example/#/post/2", "T")
+        inst = DefaultListCreator([self._collector(one), self._collector(two)], article_order=ArticleOrder.IN_ORDER,
+                                  skip_duplicate_urls=True)
+        self.assertEqual(inst.get_article_metadatas(), [one, two])
 
     def test_callback_collectors(self):
         # filters out the articles that aren't relevant to this collector

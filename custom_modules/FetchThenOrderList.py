@@ -27,7 +27,7 @@ class FetchThenOrderList(DefaultListCreator, DefaultArticleFetcher):
         should_call_used_articles_callback: bool = True,
         replace_table_source_ids: Sequence[Union[str, int]] = [],
         error_log_callback: Optional[Callable] = print, info_log_callback: Optional[Callable] = print,
-        skip_duplicate_urls: bool = True):
+        skip_duplicate_urls: bool = False):
 
         max_num_articles = max_val if max_type == MaxType.NUM_ARTICLES else -1
         # Note that we're passing False in for should_call_used_articles_callback here because we don't want
