@@ -217,7 +217,7 @@ def _is_only_label(element: Tag) -> bool:
 
 def _is_link_list(element: Tag) -> bool:
     """A list whose items are all, or nearly all, link text."""
-    if not isinstance(element, Tag) or element.name not in ('ul', 'ol'):
+    if element.name not in ('ul', 'ol'):
         return False
     items = element.find_all('li', recursive=False)
     if not items:
@@ -254,7 +254,7 @@ def _remove_related_links(soup: BeautifulSoup):
         following = heading.next_sibling
         while isinstance(following, NavigableString) and not following.strip():
             following = following.next_sibling
-        if _is_link_list(following):
+        if isinstance(following, Tag) and _is_link_list(following):
             if small(following):
                 following.decompose()
                 heading.decompose()
