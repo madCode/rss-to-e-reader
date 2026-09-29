@@ -52,6 +52,12 @@ class TestMarkdownCollector(unittest.TestCase):
         self.assertTrue(all(m.fetch_content_from_url and m.id for m in metas))
         self.assertEqual(len(c), 0)
 
+    def test_each_list_can_be_its_own_source(self):
+        c = MarkdownCollector(self.path, error_log_callback=None, info_log_callback=None,
+                              source_id='ald', source_title='Arts & Letters Daily')
+        metas = c.get_article_metadatas()
+        self.assertEqual({(m.source_id, m.source_title) for m in metas}, {('ald', 'Arts & Letters Daily')})
+
     def test_ids_are_stable_and_unique(self):
         first = [m.id for m in self.collector().get_article_metadatas()]
         second = [m.id for m in self.collector().get_article_metadatas()]
