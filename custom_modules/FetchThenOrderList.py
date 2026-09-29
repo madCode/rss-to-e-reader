@@ -46,7 +46,7 @@ class FetchThenOrderList(DefaultListCreator, DefaultArticleFetcher):
         meta = super().get_article_metadatas()
         return self._get_articles_given_meta(meta, self._wpm)
 
-    def _hit_max_time(self, curr_time: int) -> bool:
+    def _hit_max_time(self, curr_time: float) -> bool:
         if self._max_time < 0:
             return False
         else:
@@ -56,7 +56,7 @@ class FetchThenOrderList(DefaultListCreator, DefaultArticleFetcher):
         meta = super().get_article_metadatas()
         for m in meta:
             self._ensure_id(m)
-        current_time = 0
+        current_time = 0.0
         result: List[DefaultArticle] = []
         for i in range(len(meta)):
             if self._hit_max_time(current_time):
@@ -64,7 +64,7 @@ class FetchThenOrderList(DefaultListCreator, DefaultArticleFetcher):
             next_id = meta[i+1].id if i < len(meta) - 1 else ''
             article = self._build_article(meta[i], next_id, self._wpm)
             result.append(article)
-            current_time += article.time_to_read_in_minutes()
+            current_time += article.time_to_read_exact()
         # The time limit can stop before the last article, so mark the last one included
         if result:
             result[-1].next_id = ''

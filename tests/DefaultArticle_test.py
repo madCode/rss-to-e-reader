@@ -32,6 +32,13 @@ class TestDefaultArticle(unittest.TestCase):
         a.word_count = 22
         self.assertEqual(a.time_to_read_in_minutes(), 0)
 
+    def test_time_to_read_exact_keeps_the_fraction(self):
+        a = DefaultArticle(MOCK_ARTICLE_METADATA_DO_NOT_FETCH, wpm=200)
+        a.word_count = 150
+        self.assertEqual(a.time_to_read_exact(), 0.75)
+        a._wpm = 0
+        self.assertEqual(a.time_to_read_exact(), 0.0)
+
     def test_time_to_read_str(self):
         a = DefaultArticle(MOCK_ARTICLE_METADATA_DO_NOT_FETCH)
         # converts hours with remainder correctly

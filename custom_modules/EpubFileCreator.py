@@ -86,7 +86,7 @@ class EpubFileCreator(FileCreator):
         return self.filestub + '.epub'
 
     def _total_minutes(self) -> int:
-        return sum(a.time_to_read_in_minutes() for a in self.articles)
+        return round(sum(a.time_to_read_exact() for a in self.articles))
 
     def _contents_page(self, chapter_files: List[str]) -> str:
         items = []
