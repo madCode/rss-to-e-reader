@@ -26,13 +26,14 @@ class FetchThenOrderList(DefaultListCreator, DefaultArticleFetcher):
         max_val: int = -1, reading_speed_wpm: int = 300,
         should_call_used_articles_callback: bool = True,
         replace_table_source_ids: Sequence[Union[str, int]] = [],
-        error_log_callback: Optional[Callable] = print, info_log_callback: Optional[Callable] = print):
+        error_log_callback: Optional[Callable] = print, info_log_callback: Optional[Callable] = print,
+        skip_duplicate_urls: bool = True):
 
         max_num_articles = max_val if max_type == MaxType.NUM_ARTICLES else -1
         # Note that we're passing False in for should_call_used_articles_callback here because we don't want
         #   the DefaultListCreator calling the callback. FetchAndOrderList will decide when to call the callbacks, if at all.
         DefaultListCreator.__init__(self, collectors, article_order, max_num_articles, max_per_source_id,
-            False, error_log_callback, info_log_callback)
+            False, error_log_callback, info_log_callback, skip_duplicate_urls)
         DefaultArticleFetcher.__init__(self, [], replace_table_source_ids, error_log_callback, info_log_callback)
         self.call_collector_callback = should_call_used_articles_callback
         self._max_time = max_val if max_type == MaxType.TIME_IN_MINUTES else -1

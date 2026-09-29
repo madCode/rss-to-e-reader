@@ -4,7 +4,12 @@ from enum import Enum
 from base_classes.list_creator import ListCreator
 from base_classes.list_creator import ListCreator
 import random
-from typing import List, Optional, Callable, Dict
+from typing import List, Optional, Callable, Dict, Set
+
+def _url_key(url: str) -> str:
+    """The url compared for duplicates: a #fragment or trailing slash doesn't make it another page."""
+    return url.split('#', 1)[0].rstrip('/').strip()
+
 
 class ArticleOrder(Enum):
     """
@@ -29,6 +34,7 @@ class DefaultListCreator(ListCreator):
         max_num_articles: int = -1, max_per_source_id: int = -1,
         should_call_used_articles_callback: bool = True,
         error_log_callback: Optional[Callable] = print, info_log_callback: Optional[Callable] = print,
+        skip_duplicate_urls: bool = True,
     ):
         """
         Parameters
@@ -45,8 +51,15 @@ class DefaultListCreator(ListCreator):
             Should the DefaultListCreator call each Collectors' used_articles_callback function? Defaults to true.
         error_log_callback: Optional[Callable], optional
         info_log_callback: Optional[Callable], optional
+        skip_duplicate_urls: bool, optional
+            Include a link only once when several Collectors (or feeds) carry it. The copies left out
+            are still passed to their own Collector's used_articles_callback when the included one is
+            used, so each Collector marks it done. Defaults to True.
         """
         super().__init__(error_log_callback, info_log_callback)
+        self._skip_duplicate_urls = skip_duplicate_urls
+        # Copies left out, by the key of the included article's url.
+        self._duplicates: Dict[str, List[ArticleMetadata]] = {}
         self._collectors = collectors
         self._article_order = article_order
         self._max_num_articles = max_num_articles
@@ -77,6 +90,8 @@ class DefaultListCreator(ListCreator):
             list of all ArticleMetadata for that Collector that is qualified to be in the final document.
         """
         chosen_articles_by_collector: Dict[int,List[ArticleMetadata]] = {}
+        self._duplicates = {}
+        seen: Set[str] = set()
         i = 0
         for collector in self._collectors:
             articles = collector.get_article_metadatas()
@@ -84,9 +99,15 @@ class DefaultListCreator(ListCreator):
             chosen_articles = []
             for article in articles:
                 if self._should_include_article(article, total_per_source):
+                    article.set_collector_id(str(i))
+                    key = _url_key(article.url)
+                    if self._skip_duplicate_urls and key:
+                        if key in seen:
+                            self._duplicates.setdefault(key, []).append(article)
+                            continue
+                        seen.add(key)
                     source_amount = total_per_source.get(article.source_id, 0)
                     total_per_source[article.source_id] = source_amount + 1
-                    article.set_collector_id(str(i))
                     chosen_articles.append(article)
             chosen_articles_by_collector[i] = chosen_articles
             i += 1
@@ -182,9 +203,12 @@ class DefaultListCreator(ListCreator):
         articles: List[ArticleMetadata]
             The final list of used articles
         """
+        used = list(articles)
+        for article in articles:
+            used += self._duplicates.get(_url_key(article.url), [])
         i = 0
         for collector in self._collectors:
-            collector.used_articles_callback([a for a in articles if a.collector_id == str(i)])
+            collector.used_articles_callback([a for a in used if a.collector_id == str(i)])
             i += 1
 
     def get_article_metadatas(self) -> List[ArticleMetadata]:

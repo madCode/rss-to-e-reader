@@ -20,17 +20,17 @@ class TestDefaultListCreator(unittest.TestCase):
     
     def test_filter_collector_articles(self):
         collector = TtrssCollector("API")
-        article1 = ArticleMetadata("TITLE1","URL","SOURCE")
-        article2 = ArticleMetadata("TITLE2","URL","SOURCE")
-        article3 = ArticleMetadata("TITLE3","URL","SOURCE1")
-        article4 = ArticleMetadata("TITLE4","URL","SOURCE")
+        article1 = ArticleMetadata("TITLE1","URL1","SOURCE")
+        article2 = ArticleMetadata("TITLE2","URL2","SOURCE")
+        article3 = ArticleMetadata("TITLE3","URL3","SOURCE1")
+        article4 = ArticleMetadata("TITLE4","URL4","SOURCE")
         collector.get_article_metadatas = mock.MagicMock(return_value=[
             article1, article2, article3, article4])
         collector2 = TtrssCollector("API")
-        article5 = ArticleMetadata("TITLE5","URL","SOURCE")
-        article6 = ArticleMetadata("TITLE6","URL","SOURCE")
-        article7 = ArticleMetadata("TITLE7","URL","SOURCE1")
-        article8 = ArticleMetadata("TITLE8","URL","SOURCE")
+        article5 = ArticleMetadata("TITLE5","URL5","SOURCE")
+        article6 = ArticleMetadata("TITLE6","URL6","SOURCE")
+        article7 = ArticleMetadata("TITLE7","URL7","SOURCE1")
+        article8 = ArticleMetadata("TITLE8","URL8","SOURCE")
         collector2.get_article_metadatas = mock.MagicMock(return_value=[
             article5, article6, article7, article8])
         inst = DefaultListCreator([collector, collector2], max_per_source_id=1)
@@ -42,14 +42,14 @@ class TestDefaultListCreator(unittest.TestCase):
         )
     
     def test_zip_collectors(self):
-        article1 = ArticleMetadata("TITLE1","URL","SOURCE")
-        article2 = ArticleMetadata("TITLE2","URL","SOURCE")
-        article3 = ArticleMetadata("TITLE3","URL","SOURCE")
-        article4 = ArticleMetadata("TITLE4","URL","SOURCE")
-        article5 = ArticleMetadata("TITLE5","URL","SOURCE")
-        article6 = ArticleMetadata("TITLE6","URL","SOURCE")
-        article7 = ArticleMetadata("TITLE7","URL","SOURCE")
-        article8 = ArticleMetadata("TITLE8","URL","SOURCE")
+        article1 = ArticleMetadata("TITLE1","URL1","SOURCE")
+        article2 = ArticleMetadata("TITLE2","URL2","SOURCE")
+        article3 = ArticleMetadata("TITLE3","URL3","SOURCE")
+        article4 = ArticleMetadata("TITLE4","URL4","SOURCE")
+        article5 = ArticleMetadata("TITLE5","URL5","SOURCE")
+        article6 = ArticleMetadata("TITLE6","URL6","SOURCE")
+        article7 = ArticleMetadata("TITLE7","URL7","SOURCE")
+        article8 = ArticleMetadata("TITLE8","URL8","SOURCE")
 
         # no max
         #   two collectors
@@ -87,14 +87,14 @@ class TestDefaultListCreator(unittest.TestCase):
    
 
     def test_in_order(self):
-        article1 = ArticleMetadata("TITLE1","URL","SOURCE")
-        article2 = ArticleMetadata("TITLE2","URL","SOURCE")
-        article3 = ArticleMetadata("TITLE3","URL","SOURCE")
-        article4 = ArticleMetadata("TITLE4","URL","SOURCE")
-        article5 = ArticleMetadata("TITLE5","URL","SOURCE")
-        article6 = ArticleMetadata("TITLE6","URL","SOURCE")
-        article7 = ArticleMetadata("TITLE7","URL","SOURCE")
-        article8 = ArticleMetadata("TITLE8","URL","SOURCE")
+        article1 = ArticleMetadata("TITLE1","URL1","SOURCE")
+        article2 = ArticleMetadata("TITLE2","URL2","SOURCE")
+        article3 = ArticleMetadata("TITLE3","URL3","SOURCE")
+        article4 = ArticleMetadata("TITLE4","URL4","SOURCE")
+        article5 = ArticleMetadata("TITLE5","URL5","SOURCE")
+        article6 = ArticleMetadata("TITLE6","URL6","SOURCE")
+        article7 = ArticleMetadata("TITLE7","URL7","SOURCE")
+        article8 = ArticleMetadata("TITLE8","URL8","SOURCE")
 
         # no max
         #   two collectors
@@ -135,14 +135,14 @@ class TestDefaultListCreator(unittest.TestCase):
         You can't really test randomness, but we can test that we get all the articles we expect
             or at least get the number of articles that we expect and they're all unique
         """
-        article1 = ArticleMetadata("TITLE1","URL","SOURCE")
-        article2 = ArticleMetadata("TITLE2","URL","SOURCE")
-        article3 = ArticleMetadata("TITLE3","URL","SOURCE")
-        article4 = ArticleMetadata("TITLE4","URL","SOURCE")
-        article5 = ArticleMetadata("TITLE5","URL","SOURCE")
-        article6 = ArticleMetadata("TITLE6","URL","SOURCE")
-        article7 = ArticleMetadata("TITLE7","URL","SOURCE")
-        article8 = ArticleMetadata("TITLE8","URL","SOURCE")
+        article1 = ArticleMetadata("TITLE1","URL1","SOURCE")
+        article2 = ArticleMetadata("TITLE2","URL2","SOURCE")
+        article3 = ArticleMetadata("TITLE3","URL3","SOURCE")
+        article4 = ArticleMetadata("TITLE4","URL4","SOURCE")
+        article5 = ArticleMetadata("TITLE5","URL5","SOURCE")
+        article6 = ArticleMetadata("TITLE6","URL6","SOURCE")
+        article7 = ArticleMetadata("TITLE7","URL7","SOURCE")
+        article8 = ArticleMetadata("TITLE8","URL8","SOURCE")
 
         # no max
         #   two collectors
@@ -179,15 +179,55 @@ class TestDefaultListCreator(unittest.TestCase):
         })
         self.assertEqual(len(set(articles)), 4) # contains 4 unique items
 
+    def _collector(self, *articles):
+        collector = TtrssCollector("API")
+        collector.get_article_metadatas = mock.MagicMock(return_value=list(articles))
+        collector.used_articles_callback = mock.MagicMock()
+        return collector
+
+    def test_a_link_in_two_collectors_goes_in_once_and_both_mark_it_used(self):
+        """The same story in tt-rss and a reading list: deliver it once, but let each
+        collector mark its own copy, or the other copy comes back the next day."""
+        feed_copy = ArticleMetadata("From a feed", "https://example.com/story/", "FEED")
+        saved_copy = ArticleMetadata("Saved", "https://example.com/story#comments", "LIST")
+        other = ArticleMetadata("Other", "https://example.com/other", "LIST")
+        ttrss = self._collector(feed_copy)
+        reading_list = self._collector(saved_copy, other)
+
+        inst = DefaultListCreator([ttrss, reading_list], article_order=ArticleOrder.IN_ORDER)
+        articles = inst.get_article_metadatas()
+
+        self.assertEqual(articles, [feed_copy, other])
+        ttrss.used_articles_callback.assert_called_with([feed_copy])
+        reading_list.used_articles_callback.assert_called_with([other, saved_copy])
+
+    def test_a_duplicate_whose_kept_copy_is_left_out_is_not_marked_used(self):
+        first = ArticleMetadata("First", "https://example.com/a", "S")
+        dup = ArticleMetadata("Dup", "https://example.com/a", "T")
+        later = ArticleMetadata("Later", "https://example.com/b", "S")
+        one = self._collector(later, first)
+        two = self._collector(dup)
+        inst = DefaultListCreator([one, two], article_order=ArticleOrder.IN_ORDER, max_num_articles=1)
+
+        self.assertEqual(inst.get_article_metadatas(), [later])
+        two.used_articles_callback.assert_called_with([])
+
+    def test_duplicates_can_be_kept(self):
+        a = ArticleMetadata("A", "https://example.com/a", "S")
+        b = ArticleMetadata("B", "https://example.com/a", "T")
+        inst = DefaultListCreator([self._collector(a), self._collector(b)], article_order=ArticleOrder.IN_ORDER,
+                                  skip_duplicate_urls=False)
+        self.assertEqual(inst.get_article_metadatas(), [a, b])
+
     def test_callback_collectors(self):
         # filters out the articles that aren't relevant to this collector
-        article1 = ArticleMetadata("TITLE1","URL","SOURCE")
+        article1 = ArticleMetadata("TITLE1","URL1","SOURCE")
         article1.set_collector_id('0')
-        article2 = ArticleMetadata("TITLE2","URL","SOURCE")
+        article2 = ArticleMetadata("TITLE2","URL2","SOURCE")
         article2.set_collector_id('0')
-        article3 = ArticleMetadata("TITLE3","URL","SOURCE")
+        article3 = ArticleMetadata("TITLE3","URL3","SOURCE")
         article3.set_collector_id('1')
-        article4 = ArticleMetadata("TITLE4","URL","SOURCE")
+        article4 = ArticleMetadata("TITLE4","URL4","SOURCE")
         article4.set_collector_id('2')
         collector1 = TtrssCollector("API")
         collector1.used_articles_callback = mock.MagicMock()
@@ -204,19 +244,19 @@ class TestDefaultListCreator(unittest.TestCase):
 
     def get_article_metadatas(self):
         collector = TtrssCollector("API")
-        article1 = ArticleMetadata("TITLE1","URL","SOURCE")
-        article2 = ArticleMetadata("TITLE2","URL","SOURCE")
-        article3 = ArticleMetadata("TITLE3","URL","SOURCE")
-        article4 = ArticleMetadata("TITLE4","URL","SOURCE")
+        article1 = ArticleMetadata("TITLE1","URL1","SOURCE")
+        article2 = ArticleMetadata("TITLE2","URL2","SOURCE")
+        article3 = ArticleMetadata("TITLE3","URL3","SOURCE")
+        article4 = ArticleMetadata("TITLE4","URL4","SOURCE")
         collector.get_article_metadatas = mock.MagicMock(return_value=[
             article1, article2, article3, article4])
         collector.used_articles_callback = mock.MagicMock()
 
         collector2 = TtrssCollector("API")
-        article5 = ArticleMetadata("TITLE5","URL","SOURCE")
-        article6 = ArticleMetadata("TITLE6","URL","SOURCE")
-        article7 = ArticleMetadata("TITLE7","URL","SOURCE")
-        article8 = ArticleMetadata("TITLE8","URL","SOURCE")
+        article5 = ArticleMetadata("TITLE5","URL5","SOURCE")
+        article6 = ArticleMetadata("TITLE6","URL6","SOURCE")
+        article7 = ArticleMetadata("TITLE7","URL7","SOURCE")
+        article8 = ArticleMetadata("TITLE8","URL8","SOURCE")
         collector2.get_article_metadatas = mock.MagicMock(return_value=[
             article5, article6, article7, article8])
         collector2.used_articles_callback = mock.MagicMock()
