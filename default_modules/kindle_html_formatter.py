@@ -82,6 +82,12 @@ _FURNITURE_HEADING = re.compile(
     r'most (read|popular)|more (on|from) .{1,40}|related (stories|articles|coverage|posts|content)',
     re.IGNORECASE,
 )
+# The ones no article uses for a section of its own paragraphs ("More on the method" can be), so
+# they go even when trafilatura has dropped their links and left them over the article's next paragraph.
+_LONE_FURNITURE_HEADING = re.compile(
+    r'recommended( (stories|articles|reading|for you))?|read next|you (may|might) also like|most (read|popular)',
+    re.IGNORECASE,
+)
 _LINK_TEXT_SHARE = 0.8
 _WHITESPACE = re.compile(r'\s+')
 # Characters that mean the "url" is really mangled markup, not something worth percent-encoding.
@@ -258,7 +264,8 @@ def _remove_related_links(soup: BeautifulSoup):
             if small(following):
                 following.decompose()
                 heading.decompose()
-        elif following is None or (isinstance(following, Tag) and following.name not in ('ul', 'ol')):
+        elif (_LONE_FURNITURE_HEADING.fullmatch(heading.get_text().strip())
+              and not (isinstance(following, Tag) and following.name in ('ul', 'ol', 'dl', 'table'))):
             heading.decompose()
 
 

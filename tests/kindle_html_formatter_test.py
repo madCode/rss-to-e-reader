@@ -32,6 +32,14 @@ class TestCleanHtml(unittest.TestCase):
         long_list = f'<h2>Recommended reading</h2><ul>{items}</ul>'
         self.assertEqual(clean_html('<p>Intro.</p>' + long_list), '<p>Intro.</p>' + long_list)
 
+    def test_an_articles_own_section_titles_stay(self):
+        body = '<p>' + 'Words of the article itself. ' * 30 + '</p>'
+        for section in ('<h2>More on the method</h2><p>We sampled weekly.</p>',
+                        '<h2>Read more</h2><p>Our findings are below.</p>',
+                        '<h2>Read next</h2><table><tr><th>Part</th><th>Date</th></tr><tr><td>Two</td><td>May</td></tr></table>',
+                        '<h2>Recommended</h2><ul><li>Plain advice</li><li>Without links</li></ul>'):
+            self.assertEqual(clean_html(body + section), body + section)
+
     def test_screen_reader_text_that_labels_an_icon_link_stays(self):
         self.assertEqual(
             clean_html('<p>Text <a href="https://example.com/f.pdf"><span class="sr-only">Download PDF</span></a> end.</p>'),
