@@ -214,11 +214,15 @@ def remove_screen_reader_only(soup: BeautifulSoup) -> bool:
 
 
 def _is_only_label(element: Tag) -> bool:
-    """Whether element is all the text a link or button has, as on an icon link: removed, the link would be empty."""
+    """Whether element is part of all the text a link or button has, as on an icon link: without its
+    screen-reader text, the link would be empty."""
     control = element.find_parent(['a', 'button'])
     if control is None:
         return False
-    return control.get_text().strip() == element.get_text().strip()
+    screen_reader_text = ''.join(
+        e.get_text() for e in control.find_all(True)
+        if {c.lower() for c in attr(e, 'class').split()} & SCREEN_READER_ONLY)
+    return not control.get_text().replace(screen_reader_text, '', 1).strip()
 
 
 def _is_link_list(element: Tag) -> bool:

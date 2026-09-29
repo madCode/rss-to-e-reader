@@ -44,6 +44,9 @@ class TestCleanHtml(unittest.TestCase):
         self.assertEqual(
             clean_html('<p>Text <a href="https://example.com/f.pdf"><span class="sr-only">Download PDF</span></a> end.</p>'),
             '<p>Text <a href="https://example.com/f.pdf">Download PDF</a> end.</p>')
+        self.assertEqual(
+            clean_html('<p><a href="https://example.com/m"><span class="sr-only">Open</span><span class="sr-only">menu</span></a></p>'),
+            '<p><a href="https://example.com/m">Openmenu</a></p>')
 
     def test_a_long_reading_list_under_a_related_heading_stays(self):
         items = ''.join(f'<li><a href="https://example.com/{i}">A long and interesting book title number {i}</a></li>' for i in range(12))
