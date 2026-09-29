@@ -51,3 +51,14 @@ A test should be able to catch a plausible regression.
   the old version.
 - When a change has no behaviour to test (a deletion, a comment, docs), say
   so in the PR rather than inventing a test.
+
+## Pull requests
+
+Before opening a PR that changes behaviour, have a fresh-eyes subagent
+review the diff. Point it at the risky parts (how the change interacts with
+other collectors, list creators and senders, config shapes, failure paths),
+and ask for concrete findings only: file:line and a failure scenario, most
+severe first, no edits. Verify each finding before acting on it, and say in
+the PR what the review found and what was fixed or deliberately left.
+Docs-, comment- and config-only changes can skip this; after fixing the
+findings, a short second look at just the new diff is enough.
