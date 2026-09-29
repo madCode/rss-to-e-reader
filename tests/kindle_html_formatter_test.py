@@ -15,6 +15,10 @@ class TestCleanHtml(unittest.TestCase):
         self.assertEqual(
             clean_html('<figure><img src="https://example.com/a.jpg"><figcaption>Cap</figcaption><span>Photo: Getty</span></figure>'),
             '<figure><img alt="" src="https://example.com/a.jpg"/><div>Cap</div>Photo: Getty</figure>')
+        # One caption per figure: the first of two goes, the last stays.
+        self.assertEqual(
+            clean_html('<figure><figcaption>A</figcaption><img src="https://example.com/a.jpg"><figcaption>B</figcaption></figure>'),
+            '<figure><div>A</div><img alt="" src="https://example.com/a.jpg"/><figcaption>B</figcaption></figure>')
         valid = '<figure><img alt="" src="https://example.com/a.jpg"/><figcaption>Cap</figcaption></figure>'
         self.assertEqual(clean_html(valid), valid)
 
