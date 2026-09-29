@@ -25,7 +25,8 @@ Note that the first url is considered "to do" and the second article is consider
 class MarkdownCollector(Collector):
     TO_DO_LIST_REGEX = r"\-\s\[(?P<status>[x\s])\]\s(?P<url>.*)"
 
-    def __init__(self, list_filepath: str, error_log_callback: Optional[Callable] = print, info_log_callback: Optional[Callable] = print):
+    def __init__(self, list_filepath: str, error_log_callback: Optional[Callable] = print, info_log_callback: Optional[Callable] = print,
+                 source_id: str = "0", source_title: str = 'List of Articles To Read'):
         """
         Parameters
         ----------
@@ -41,8 +42,15 @@ class MarkdownCollector(Collector):
         info_logs: function that takes in a string and does not return, optional
             Allows user to pass in a callback for info level logs.
             Defaults to system print function
+        source_id: str, optional
+            The source_id every article from this list gets. Defaults to "0". Give each list its own when using
+            several, so per-source limits and credits treat them separately.
+        source_title: str, optional
+            The source_title every article from this list gets. Defaults to 'List of Articles To Read'.
         """
-        super().__init__(error_log_callback, info_log_callback)  
+        super().__init__(error_log_callback, info_log_callback)
+        self._source_id = source_id
+        self._source_title = source_title
         self._filepath: str = list_filepath  
         self._to_do: List[str] = []
         self._data: Dict[str,ListItemDict] = {}
@@ -99,7 +107,7 @@ class MarkdownCollector(Collector):
         while article == None and len(self._to_do) > 0:
             url = self._to_do.pop(0)
             try:
-                article = ArticleMetadata('', url, source_id="0", source_title='List of Articles To Read', article_id=hashlib.sha1(url.encode('utf-8')).hexdigest()[:12])
+                article = ArticleMetadata('', url, source_id=self._source_id, source_title=self._source_title, article_id=hashlib.sha1(url.encode('utf-8')).hexdigest()[:12])
             except Exception as e:
                 self.log_error("Error fetching article: ")
                 print(e)
