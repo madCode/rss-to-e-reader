@@ -74,6 +74,14 @@ class TestEpubFileCreator(unittest.TestCase):
         self.assertIn('<dc:title>Daily &lt;Reading&gt;</dc:title>', opf)
         self.assertNotIn('linear="no"', opf)
 
+    def test_contents_total_adds_up_short_pieces(self):
+        """Three 150-word pieces at 200 wpm are 2.25 minutes, not three times 0."""
+        words = '<p>' + 'word ' * 150 + '</p>'
+        creator = EpubFileCreator(self.stub, [article(i, words) for i in range(3)], 'T', info_log_callback=None)
+        self.assertIn('3 articles · 2 min', creator._contents_page(['a.xhtml', 'b.xhtml', 'c.xhtml']))
+        short = EpubFileCreator(self.stub, [article(1, '<p>A few words.</p>')], 'T', info_log_callback=None)
+        self.assertIn('1 articles · &lt; 1 min', short._contents_page(['a.xhtml']))
+
     def test_without_cover(self):
         names = self.write([article(1, '<p>x</p>')], include_cover=False).namelist()
         self.assertNotIn('EPUB/cover.jpg', names)

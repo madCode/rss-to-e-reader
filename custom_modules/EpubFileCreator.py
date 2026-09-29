@@ -85,8 +85,11 @@ class EpubFileCreator(FileCreator):
     def filepath(self) -> str:
         return self.filestub + '.epub'
 
-    def _total_minutes(self) -> int:
-        return round(sum(a.time_to_read_exact() for a in self.articles))
+    def _total_time_str(self) -> str:
+        total = sum(a.time_to_read_exact() for a in self.articles)
+        if 0 < total < 1:
+            return '< 1 min'
+        return self._time_str(int(total + 0.5))
 
     def _contents_page(self, chapter_files: List[str]) -> str:
         items = []
@@ -96,7 +99,7 @@ class EpubFileCreator(FileCreator):
                 f'<li><a href="{file_name}">{escape(article.display_title)}</a>'
                 f'<br/><span class="meta">{escape(meta)}</span></li>')
         return (f'<h1>{escape(self.title)}</h1>'
-                f'<p class="byline">{len(self.articles)} articles · {self._time_str(self._total_minutes())}</p>'
+                f'<p class="byline">{len(self.articles)} articles · {escape(self._total_time_str())}</p>'
                 f'<ol class="contents">{"".join(items)}</ol>')
 
     @staticmethod
@@ -184,7 +187,7 @@ class EpubFileCreator(FileCreator):
         y += 60
         detail_font = font(54)
         details = [date.today().strftime('%A, %B %-d, %Y'),
-                   f'{len(self.articles)} articles · {self._time_str(self._total_minutes())}']
+                   f'{len(self.articles)} articles · {escape(self._total_time_str())}']
         sources = list(dict.fromkeys(a.meta.source_title for a in self.articles if a.meta.source_title))
         if sources:
             details.append(', '.join(sources[:4]) + (' and more' if len(sources) > 4 else ''))

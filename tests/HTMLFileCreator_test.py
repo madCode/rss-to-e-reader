@@ -24,3 +24,14 @@ class TestHTMLFileCreator(unittest.TestCase):
 
             path = HTMLFileCreator(os.path.join(d, 'ascii'), articles, 'T', info_log_callback=None, ascii_only=True).write_file()
             self.assertIn('"Quoted" naive', Path(path).read_text(encoding='utf-8'))
+
+    def test_total_read_time_adds_up_short_pieces(self):
+        metas = [ArticleMetadata(f'T{i}', f'https://example.com/{i}', 's', '', 'Feed', f'{i}') for i in range(3)]
+        words = '<p>' + 'word ' * 150 + '</p>'
+        articles = [DefaultArticle(m, display_content=words) for m in metas]
+        toc = HTMLFileCreator('unused', articles, 'T', info_log_callback=None)._get_table_of_contents()
+        self.assertIn('Total Read Time: 2 min', toc)
+        short = HTMLFileCreator('unused', articles[:1], 'T', info_log_callback=None)
+        short.articles[0].word_count = 20
+        self.assertIn('(&lt; 1 min)', short._get_table_of_contents())
+        self.assertIn('Total Read Time: &lt; 1 min', short._get_table_of_contents())
