@@ -25,7 +25,9 @@ A comment is for what the code can't say itself:
 Not:
 
 - **Restating the code.** `# loop over the articles`, `# return the path`,
-  or a comment that repeats a well-named function's name in prose.
+  or a comment that repeats a well-named function's name in prose. A label
+  that says what an ambiguous name refers to is not restating: it tells the
+  reader something the name doesn't.
 - **Anything that belongs in a PR description or PR comment:** history
   ("used to", "the original version", "since the rewrite"), what was removed
   or deliberately not done and why, and review back-and-forth. That stays
