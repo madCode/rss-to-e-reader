@@ -25,7 +25,7 @@ import trafilatura  # type: ignore
 from readability import Document  # type: ignore
 
 from default_modules.browser_impersonation import DEFAULT_IMPERSONATE, impersonated_get, looks_blocked
-from default_modules.kindle_html_formatter import attr, count_words, text_to_html
+from default_modules.kindle_html_formatter import attr, count_words, remove_screen_reader_only, text_to_html
 
 USER_AGENT = (
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) '
@@ -295,7 +295,8 @@ def extract_article(
     if not meta.get('title'):
         title_tag = soup.find('title')
         meta['title'] = clean_title(title_tag.get_text() if title_tag else '', url=url)
-    if remove_overlays(soup):
+    removed_overlays = remove_overlays(soup)
+    if remove_screen_reader_only(soup) or removed_overlays:
         html = str(soup)
 
     def run(name: str, stage: Callable[[], Optional[str]]) -> Optional[ExtractedArticle]:

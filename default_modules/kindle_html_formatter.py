@@ -71,6 +71,24 @@ BOILERPLATE_MAX_WORDS = 12
 PREFERRED_IMAGE_WIDTH = 1000
 LAYOUT_TABLE_CELL_WORDS = 80
 _HTML_TAG_PATTERN = re.compile(r'<\s*[a-zA-Z!/]')
+SCREEN_READER_ONLY: Set[str] = {
+    'screen-reader-text', 'screen-reader-only', 'sr-only', 'sr-text', 'visually-hidden', 'visuallyhidden', 'a11y-hidden',
+}
+SCREEN_READER_MAX_WORDS = 12
+# Headings that name a site's box of links, never a section of the article itself. "Related" and
+# "Further reading" aren't here: authors use them for their own references.
+_FURNITURE_HEADING = re.compile(
+    r'recommended( (stories|articles|reading|for you))?|read (next|more)|you (may|might) also like|'
+    r'most (read|popular)|more (on|from) .{1,40}|related (stories|articles|coverage|posts|content)',
+    re.IGNORECASE,
+)
+# The ones no article uses for a section of its own paragraphs ("More on the method" can be), so
+# they go even when trafilatura has dropped their links and left them over the article's next paragraph.
+_LONE_FURNITURE_HEADING = re.compile(
+    r'recommended( (stories|articles|reading|for you))?|read next|you (may|might) also like|most (read|popular)',
+    re.IGNORECASE,
+)
+_LINK_TEXT_SHARE = 0.8
 _WHITESPACE = re.compile(r'\s+')
 # Characters that mean the "url" is really mangled markup, not something worth percent-encoding.
 _MANGLED_URL_CHARACTERS = re.compile(r'["\\<>]')
@@ -131,7 +149,9 @@ def clean_html(
     for element in soup.find_all(list(REMOVE_TAGS - {'source'})):
         element.decompose()
     _remove_hidden(soup)
+    remove_screen_reader_only(soup)
     _remove_junk(soup)
+    _remove_related_links(soup)
     _remove_boilerplate(soup)
     _fix_pictures(soup)
     _fix_images(soup, base_url, keep_images)
@@ -171,6 +191,86 @@ def _remove_hidden(soup: BeautifulSoup):
             # Paywall scripts mark the article body aria-hidden (the NYT does), so keep it if it's most of the text.
             if len(element.get_text(' ').split()) / total_words < 0.4:
                 element.decompose()
+
+
+def remove_screen_reader_only(soup: BeautifulSoup) -> bool:
+    """
+    Removes text meant only for screen readers ("list 1 of 4", "Skip to content"), which sites hide
+    with CSS an e-reader doesn't have. Extractors drop class names, so article_parser calls this before
+    extracting. It goes by length, not share of the page: before extraction the page still includes
+    navigation and comments, and some paywalls put the article body in one of these classes.
+    Returns whether anything was removed.
+    """
+    removed = False
+    for element in soup.find_all(True):
+        if element.decomposed:
+            continue
+        classes = {c.lower() for c in attr(element, 'class').split()}
+        if (classes & SCREEN_READER_ONLY and len(element.get_text(' ').split()) <= SCREEN_READER_MAX_WORDS
+                and element.find('img') is None and not _is_only_label(element)):
+            element.decompose()
+            removed = True
+    return removed
+
+
+def _is_only_label(element: Tag) -> bool:
+    """Whether element is part of all the text a link or button has, as on an icon link: without its
+    screen-reader text, the link would be empty."""
+    control = element.find_parent(['a', 'button'])
+    if control is None:
+        return False
+    screen_reader_text = ''.join(
+        e.get_text() for e in control.find_all(True)
+        if {c.lower() for c in attr(e, 'class').split()} & SCREEN_READER_ONLY)
+    return not control.get_text().replace(screen_reader_text, '', 1).strip()
+
+
+def _is_link_list(element: Tag) -> bool:
+    """A list whose items are all, or nearly all, link text."""
+    if element.name not in ('ul', 'ol'):
+        return False
+    items = element.find_all('li', recursive=False)
+    if not items:
+        return False
+    for li in items:
+        text = li.get_text()
+        if not text.strip() or len(''.join(a.get_text() for a in li.find_all('a'))) < _LINK_TEXT_SHARE * len(text):
+            return False
+    return True
+
+
+def _remove_related_links(soup: BeautifulSoup):
+    """
+    Removes a "Recommended stories" style box of links. Extractors often flatten the box, so this goes
+    by the heading and the list right after it rather than a class; trafilatura can also drop the list
+    and leave the heading over the article's next paragraph, so such a heading goes on its own too.
+    A list long enough to be a real part of the article stays, with its heading.
+    """
+    total_words = len(soup.get_text(' ').split()) or 1
+
+    def small(element: Tag) -> bool:
+        return len(element.get_text(' ').split()) / total_words < 0.4
+
+    for heading in soup.find_all(['h2', 'h3', 'h4', 'h5', 'h6']):
+        if heading.decomposed or not _FURNITURE_HEADING.fullmatch(heading.get_text().strip()):
+            continue
+        box = heading.parent
+        siblings = [c for c in box.children if isinstance(c, Tag)] if isinstance(box, Tag) else []
+        if (box is not None and box.name not in ('[document]', 'body') and siblings and siblings[0] is heading
+                and len(siblings) > 1 and all(_is_link_list(c) for c in siblings[1:]) and small(box)):
+            box.decompose()
+            continue
+        # The next node, not the next tag: text between the heading and a list belongs to the heading.
+        following = heading.next_sibling
+        while isinstance(following, NavigableString) and not following.strip():
+            following = following.next_sibling
+        if isinstance(following, Tag) and _is_link_list(following):
+            if small(following):
+                following.decompose()
+                heading.decompose()
+        elif (_LONE_FURNITURE_HEADING.fullmatch(heading.get_text().strip())
+              and not (isinstance(following, Tag) and following.name in ('ul', 'ol', 'dl', 'table'))):
+            heading.decompose()
 
 
 def _remove_junk(soup: BeautifulSoup):

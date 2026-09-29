@@ -5,6 +5,59 @@ from default_modules.kindle_html_formatter import best_srcset_candidate, clean_h
 BASE = 'https://example.com/articles/one'
 
 class TestCleanHtml(unittest.TestCase):
+    def test_related_link_lists_go_but_the_articles_own_sections_stay(self):
+        body = '<p>' + 'Words of the article itself. ' * 30 + '</p>'
+        links = '<ul><li><a href="https://example.com/a">Story A</a></li><li><a href="https://example.com/b">Story B</a></li></ul>'
+        self.assertEqual(clean_html(body + '<h2>Read next</h2>' + links), body)
+        self.assertEqual(clean_html(body + '<h2>More on this story</h2>' + links), body)
+        own = '<h2>Related research</h2><p>Earlier studies found the same effect in mice.</p>'
+        self.assertEqual(clean_html(body + own), body + own)
+        # The whole box goes when the heading and its lists are all it holds.
+        self.assertEqual(clean_html(body + '<div class="more"><h3>Related stories</h3>' + links + links + '</div>'), body)
+        gallery = '<h2>More from our photographers</h2><ul><li><a href="https://example.com/p"><img alt="" src="https://example.com/p.jpg"/></a></li></ul>'
+        self.assertEqual(clean_html(body + gallery), body + gallery)
+
+    def test_a_furniture_heading_left_without_its_links_goes(self):
+        # trafilatura drops the box of links but can keep its heading over the next paragraph.
+        body = '<p>' + 'Words of the article itself. ' * 30 + '</p>'
+        self.assertEqual(clean_html(body + '<h2>Recommended Stories</h2>' + body), body + body)
+
+    def test_an_authors_own_lists_and_headings_stay(self):
+        body = '<p>' + 'Words of the article itself. ' * 30 + '</p>'
+        refs = '<h2>Further reading</h2><ul><li><a href="https://example.com/1">A paper</a></li><li><a href="https://example.com/2">A book</a></li></ul>'
+        self.assertEqual(clean_html(body + refs), body + refs)
+        intro = '<h2>Read more</h2>Two earlier pieces on this:<ul><li><a href="https://example.com/1">One</a></li></ul>'
+        self.assertEqual(clean_html(body + intro), body + intro)
+        items = ''.join(f'<li><a href="https://example.com/{i}">A long and interesting book title number {i}</a></li>' for i in range(12))
+        long_list = f'<h2>Recommended reading</h2><ul>{items}</ul>'
+        self.assertEqual(clean_html('<p>Intro.</p>' + long_list), '<p>Intro.</p>' + long_list)
+
+    def test_an_articles_own_section_titles_stay(self):
+        body = '<p>' + 'Words of the article itself. ' * 30 + '</p>'
+        for section in ('<h2>More on the method</h2><p>We sampled weekly.</p>',
+                        '<h2>Read more</h2><p>Our findings are below.</p>',
+                        '<h2>Read next</h2><table><tr><th>Part</th><th>Date</th></tr><tr><td>Two</td><td>May</td></tr></table>',
+                        '<h2>Recommended</h2><ul><li>Plain advice</li><li>Without links</li></ul>'):
+            self.assertEqual(clean_html(body + section), body + section)
+
+    def test_screen_reader_text_that_labels_an_icon_link_stays(self):
+        self.assertEqual(
+            clean_html('<p>Text <a href="https://example.com/f.pdf"><span class="sr-only">Download PDF</span></a> end.</p>'),
+            '<p>Text <a href="https://example.com/f.pdf">Download PDF</a> end.</p>')
+        self.assertEqual(
+            clean_html('<p><a href="https://example.com/m"><span class="sr-only">Open</span><span class="sr-only">menu</span></a></p>'),
+            '<p><a href="https://example.com/m">Openmenu</a></p>')
+
+    def test_a_long_reading_list_under_a_related_heading_stays(self):
+        items = ''.join(f'<li><a href="https://example.com/{i}">A long and interesting book title number {i}</a></li>' for i in range(12))
+        self.assertEqual(clean_html(f'<p>A short introduction.</p><h2>Further reading</h2><ul>{items}</ul>').count('<li>'), 12)
+
+    def test_screen_reader_labels_go_but_not_long_hidden_text_or_images(self):
+        story = 'The whole story sits in this paragraph for readers of every kind. ' * 5
+        self.assertEqual(
+            clean_html(f'<p>Text.<span class="sr-only">list 1 of 4</span></p><div class="visually-hidden"><p>{story}</p></div>'),
+            f'<p>Text.</p><div><p>{story}</p></div>')
+
     def test_plain_text_becomes_paragraphs(self):
         self.assertEqual(clean_html('first para\nstill first\n\nsecond <3'), '<p>first para still first</p><p>second &lt;3</p>')
         self.assertEqual(text_to_html(''), '')

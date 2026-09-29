@@ -6,6 +6,7 @@ from unittest.mock import patch
 import requests
 
 import default_modules.article_parser as article_parser
+from default_modules.kindle_html_formatter import clean_html
 from default_modules.article_parser import clean_title, extract_article, fetch_html, find_site_rule, select_rule, title_from_url
 
 FIXTURE = (Path(__file__).parent / 'fixtures' / 'article_page.html').read_text(encoding='utf-8')
@@ -31,6 +32,26 @@ class TestArticleParser(unittest.TestCase):
         self.assertIn('particular pleasure in reading slowly', article.html)
         self.assertNotIn('technical storage', article.html)
         self.assertNotIn('Subscribe to our newsletter', article.html)
+
+    def test_screen_reader_labels_and_recommended_stories_dont_reach_the_article(self):
+        """Shaped like Al Jazeera's markup: screen-reader labels and a "Recommended Stories"
+        box between paragraphs. The extractors drop class names, so the labels have to go first."""
+        box = ('<section class="more-on"><h2>Recommended Stories</h2><span class="screen-reader-text">list of 2 items</span>'
+               '<ul><li><span class="screen-reader-text">list 1 of 2</span><a href="/a">Another story entirely</a></li>'
+               '<li><span class="screen-reader-text">list 2 of 2</span><a href="/b">And one more story</a></li></ul>'
+               '<span class="screen-reader-text">end of list</span></section>')
+        html = FIXTURE.replace('</h1>', '</h1><span class="screen-reader-text">Skip links</span>', 1)
+        html = html.replace('</p>', '</p>' + box, 2)
+        cleaned = clean_html(extract_article(html, 'https://example.com/culture/slow').html)
+        for junk in ('list 1 of 2', 'list of 2 items', 'end of list', 'Skip links', 'Recommended Stories', 'Another story entirely'):
+            self.assertNotIn(junk, cleaned)
+        self.assertIn('particular pleasure in reading slowly', cleaned)
+
+    def test_a_hidden_article_body_on_a_busy_page_is_kept(self):
+        """Some paywalls hide the body with a screen-reader class; the labels rule goes by length, so it stays."""
+        nav = ''.join(f'<li><a href="/s{i}">Section number {i} of the site</a></li>' for i in range(60))
+        html = f'<html><body><nav><ul>{nav}</ul></nav><article><div class="visually-hidden"><p>{LONG_TEXT}</p></div></article></body></html>'
+        self.assertGreater(extract_article(html, 'https://example.com/story').word_count, 250)
 
     def test_overlay_markers_never_remove_most_of_the_page(self):
         html = f'<html><body><div class="cookie-recipes"><p>{LONG_TEXT}</p></div><p>footer</p></body></html>'
