@@ -75,15 +75,11 @@ SCREEN_READER_ONLY: Set[str] = {
     'screen-reader-text', 'screen-reader-only', 'sr-only', 'sr-text', 'visually-hidden', 'visuallyhidden', 'a11y-hidden',
 }
 SCREEN_READER_MAX_WORDS = 12
-_RELATED_HEADING = re.compile(
-    r'(recommended|related)( (stories|articles|reading|content|coverage|posts))?|more (on|from) .{1,40}|'
-    r'read (more|next)|you (may|might) also like|most (read|popular)|further reading',
-    re.IGNORECASE,
-)
-# Headings no article gives its own section: trafilatura drops the box of links under one but can
-# leave the heading behind, over the article's next paragraphs.
+# Headings that name a site's box of links, never a section of the article itself. "Related" and
+# "Further reading" aren't here: authors use them for their own references.
 _FURNITURE_HEADING = re.compile(
-    r'recommended( (stories|articles|reading|for you))?|read next|you (may|might) also like|most (read|popular)',
+    r'recommended( (stories|articles|reading|for you))?|read (next|more)|you (may|might) also like|'
+    r'most (read|popular)|more (on|from) .{1,40}|related (stories|articles|coverage|posts|content)',
     re.IGNORECASE,
 )
 _LINK_TEXT_SHARE = 0.8
@@ -205,10 +201,18 @@ def remove_screen_reader_only(soup: BeautifulSoup) -> bool:
             continue
         classes = {c.lower() for c in attr(element, 'class').split()}
         if (classes & SCREEN_READER_ONLY and len(element.get_text(' ').split()) <= SCREEN_READER_MAX_WORDS
-                and element.find('img') is None):
+                and element.find('img') is None and not _is_only_label(element)):
             element.decompose()
             removed = True
     return removed
+
+
+def _is_only_label(element: Tag) -> bool:
+    """Whether element is all the text a link or button has, as on an icon link: removed, the link would be empty."""
+    control = element.find_parent(['a', 'button'])
+    if control is None:
+        return False
+    return control.get_text().strip() == element.get_text().strip()
 
 
 def _is_link_list(element: Tag) -> bool:
@@ -227,10 +231,10 @@ def _is_link_list(element: Tag) -> bool:
 
 def _remove_related_links(soup: BeautifulSoup):
     """
-    Removes a "Recommended stories" style list of links. Extractors often flatten the box that held
-    it, so this goes by the heading and the list after it rather than a class. A heading like that
-    over the article's own paragraphs, or over a list long enough to be the article's own reading
-    list, stays.
+    Removes a "Recommended stories" style box of links. Extractors often flatten the box, so this goes
+    by the heading and the list right after it rather than a class; trafilatura can also drop the list
+    and leave the heading over the article's next paragraph, so such a heading goes on its own too.
+    A list long enough to be a real part of the article stays, with its heading.
     """
     total_words = len(soup.get_text(' ').split()) or 1
 
@@ -238,7 +242,7 @@ def _remove_related_links(soup: BeautifulSoup):
         return len(element.get_text(' ').split()) / total_words < 0.4
 
     for heading in soup.find_all(['h2', 'h3', 'h4', 'h5', 'h6']):
-        if heading.decomposed or not _RELATED_HEADING.fullmatch(heading.get_text().strip()):
+        if heading.decomposed or not _FURNITURE_HEADING.fullmatch(heading.get_text().strip()):
             continue
         box = heading.parent
         siblings = [c for c in box.children if isinstance(c, Tag)] if isinstance(box, Tag) else []
@@ -246,11 +250,15 @@ def _remove_related_links(soup: BeautifulSoup):
                 and len(siblings) > 1 and all(_is_link_list(c) for c in siblings[1:]) and small(box)):
             box.decompose()
             continue
-        following = heading.find_next_sibling()
-        if following is not None and _is_link_list(following) and small(following):
-            following.decompose()
-            heading.decompose()
-        elif _FURNITURE_HEADING.fullmatch(heading.get_text().strip()):
+        # The next node, not the next tag: text between the heading and a list belongs to the heading.
+        following = heading.next_sibling
+        while isinstance(following, NavigableString) and not following.strip():
+            following = following.next_sibling
+        if _is_link_list(following):
+            if small(following):
+                following.decompose()
+                heading.decompose()
+        elif following is None or (isinstance(following, Tag) and following.name not in ('ul', 'ol')):
             heading.decompose()
 
 

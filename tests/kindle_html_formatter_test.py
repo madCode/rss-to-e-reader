@@ -22,6 +22,21 @@ class TestCleanHtml(unittest.TestCase):
         body = '<p>' + 'Words of the article itself. ' * 30 + '</p>'
         self.assertEqual(clean_html(body + '<h2>Recommended Stories</h2>' + body), body + body)
 
+    def test_an_authors_own_lists_and_headings_stay(self):
+        body = '<p>' + 'Words of the article itself. ' * 30 + '</p>'
+        refs = '<h2>Further reading</h2><ul><li><a href="https://example.com/1">A paper</a></li><li><a href="https://example.com/2">A book</a></li></ul>'
+        self.assertEqual(clean_html(body + refs), body + refs)
+        intro = '<h2>Read more</h2>Two earlier pieces on this:<ul><li><a href="https://example.com/1">One</a></li></ul>'
+        self.assertEqual(clean_html(body + intro), body + intro)
+        items = ''.join(f'<li><a href="https://example.com/{i}">A long and interesting book title number {i}</a></li>' for i in range(12))
+        long_list = f'<h2>Recommended reading</h2><ul>{items}</ul>'
+        self.assertEqual(clean_html('<p>Intro.</p>' + long_list), '<p>Intro.</p>' + long_list)
+
+    def test_screen_reader_text_that_labels_an_icon_link_stays(self):
+        self.assertEqual(
+            clean_html('<p>Text <a href="https://example.com/f.pdf"><span class="sr-only">Download PDF</span></a> end.</p>'),
+            '<p>Text <a href="https://example.com/f.pdf">Download PDF</a> end.</p>')
+
     def test_a_long_reading_list_under_a_related_heading_stays(self):
         items = ''.join(f'<li><a href="https://example.com/{i}">A long and interesting book title number {i}</a></li>' for i in range(12))
         self.assertEqual(clean_html(f'<p>A short introduction.</p><h2>Further reading</h2><ul>{items}</ul>').count('<li>'), 12)
