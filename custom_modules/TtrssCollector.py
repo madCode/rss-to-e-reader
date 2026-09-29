@@ -56,10 +56,18 @@ class TtrssCollector(Collector):
         # tt-rss sends feed_id as an int, but source_id is a str and configs mix the two, so compare as strings.
         self._fetch_from_url_list = {str(i) for i in fetch_from_url_source_id_list}
     
+    @staticmethod
+    def _request_body(fields: Dict) -> str:
+        """The JSON body for one API call. json.dumps escapes quotes, so a
+        password containing one can't break or extend the request."""
+        return json.dumps(fields, separators=(",", ":"))
+
     def _send_ttrss_post_request(self, post_body: str) -> Union[TtrssResponse,Dict]:
         response = requests.post(self._api_url, data=post_body)
         if response.status_code != 200:
-            self.log_error(f'Failure to connect to tt-rss api.\nRequest body: {post_body} \nStatus Code: {response.status_code}')
+            # Log the operation only: the login body holds the password.
+            op = json.loads(post_body).get("op", "?")
+            self.log_error(f'Failure to connect to tt-rss api ({op}). Status Code: {response.status_code}')
             return {}
         try:
             dict_str = response.content.decode("UTF-8")
@@ -83,9 +91,9 @@ class TtrssCollector(Collector):
         """
         # If your password is empty but you did pass in a username, try anyway
         if len(self._user) > 0:
-            login_data = '{"op":"login","user":"'+self._user+'","password":"'+self._password+'"}'
+            login_data = self._request_body({"op": "login", "user": self._user, "password": self._password})
         else:
-            login_data = '{"op":"login"}'
+            login_data = self._request_body({"op": "login"})
         session_data = self._send_ttrss_post_request(login_data)
         if len(session_data) == 0:
             raise RuntimeError('Unable to authenticate session for tt-rss api. Check logs for details.')
@@ -95,7 +103,7 @@ class TtrssCollector(Collector):
         """
         Logs the user out of TTRSS and wipes the session id on the object.
         """
-        logout_data = '{"op":"logout"}'
+        logout_data = self._request_body({"op": "logout"})
         session_data = self._send_ttrss_post_request(logout_data)
         if len(session_data) == 0:
             raise RuntimeError('Unable to logout of session for tt-rss api. Check logs for details.')
@@ -106,23 +114,21 @@ class TtrssCollector(Collector):
             raise RuntimeError("Tried to get articles without logging in first")
         if self._max_num_articles == 0:
             return []
-        limit_str = f'"limit":"{self._max_num_articles}",' if self._max_num_articles > -1 else ''
-        cat_str = f'"is_cat":true,' if self._is_cat else ''
+        fields: Dict = {"sid": str(self._session_id)}
+        if self._max_num_articles > -1:
+            fields["limit"] = str(self._max_num_articles)
+        if self._is_cat:
+            fields["is_cat"] = True
+        fields.update({"op": "getHeadlines", "feed_id": str(self._fetch_feed_id),
+                       "view_mode": "unread", "show_content": "1"})
         if len(self._last_article_id) > 0:
-            get_headlines_data = (
-                '{"sid":"' + str(self._session_id) + '",'+ limit_str +
-                cat_str + '"op":"getHeadlines","feed_id":"' + str(self._fetch_feed_id) +
-                '","view_mode":"unread","show_content":"1","since_id":"' + self._last_article_id + '"}'
-            )
-        else:
-            get_headlines_data = (
-                '{"sid":"' + str(self._session_id) + '",'+ limit_str +
-                cat_str + '"op":"getHeadlines","feed_id":"'+str(self._fetch_feed_id) +
-                '","view_mode":"unread","show_content":"1"}'
-                )
+            fields["since_id"] = self._last_article_id
+        get_headlines_data = self._request_body(fields)
         headlines_response = self._send_ttrss_post_request(get_headlines_data)
         if len(headlines_response) == 0:
-            raise RuntimeError(f'Unable to get headline data from tt-rss api. Called with: {get_headlines_data}')
+            # Name only the feed: the request carries the session id.
+            raise RuntimeError(
+                f'Unable to get headline data from tt-rss api (feed {self._fetch_feed_id}). Check logs for details.')
         return headlines_response['content']
 
     def get_article_metadatas(self) -> List[ArticleMetadata]:
