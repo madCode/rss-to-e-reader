@@ -46,12 +46,13 @@ class HTMLFileCreator(FileCreator):
         return str(per_hour) + ' hr ' + str(remainder) + ' min'
     
     def _get_table_of_contents(self):
-        total_minutes = 0
+        total_minutes = 0.0
         results = []
         for article in self.articles:
-            results.append(f'<li>({article.time_to_read_str()}) <a href="#{article.anchor_id}">{escape(article.display_title)}</a></li>')
-            total_minutes += article.time_to_read_in_minutes()
-        results.insert(0, f'<h1 id="top">Table of Contents (Total Read Time: {self._time_to_read_str(total_minutes)})</h1><ol>')
+            results.append(f'<li>({escape(article.time_to_read_str())}) <a href="#{article.anchor_id}">{escape(article.display_title)}</a></li>')
+            total_minutes += article.time_to_read_exact()
+        total = '&lt; 1 min' if 0 < total_minutes < 1 else self._time_to_read_str(int(total_minutes + 0.5))
+        results.insert(0, f'<h1 id="top">Table of Contents (Total Read Time: {total})</h1><ol>')
         results.append('</ol>')
         return "".join(results)
     

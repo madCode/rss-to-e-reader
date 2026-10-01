@@ -114,6 +114,24 @@ class TestFetchThenOrderList(unittest.TestCase):
         self.assertEqual(len(articles),1)
         self.assertEqual(articles[0].display_title,MOCK_HEADLINE['title'])
 
+    def test_short_articles_use_up_the_time_budget(self):
+        """Pieces shorter than a minute still count toward the budget: with whole
+        minutes each counted as 0 and the budget took every article there was."""
+        collectors = []
+        for headline in (MOCK_HEADLINE, MOCK_HEADLINE_2, MOCK_HEADLINE):
+            m = dict(headline)
+            m['content'] = '<p>one two three four five six</p>'
+            inst = TtrssCollector("testurl")
+            inst._session_id = "987"
+            inst._send_ttrss_post_request = mock.MagicMock(return_value={'seq': 0, 'status': 1, 'content': [m]})
+            inst._login = mock.MagicMock()
+            inst._logout = mock.MagicMock()
+            collectors.append(inst)
+
+        # Six words at 10 wpm is 0.6 minutes, so a 1-minute budget is full after two.
+        f = FetchThenOrderList(collectors, max_type=MaxType.TIME_IN_MINUTES, max_val=1, reading_speed_wpm=10)
+        self.assertEqual(len(f._get_articles_max_time()), 2)
+
     def test_get_articles(self):
         f = FetchThenOrderList([])
         f._get_articles_max_time = mock.MagicMock()

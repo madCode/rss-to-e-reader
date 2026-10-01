@@ -56,6 +56,14 @@ class DefaultArticle(Article):
             return 0
         return self.word_count//self._wpm
 
+    def time_to_read_exact(self) -> float:
+        """Reading time in fractional minutes. Budgets and totals add these up:
+        whole minutes round a 150-word piece down to 0, so a run of short
+        pieces would never use up a time budget."""
+        if self._wpm <= 0:
+            return 0.0
+        return self.word_count / self._wpm
+
     def time_to_read_str(self) -> str:
         per_min = self.time_to_read_in_minutes()
         if per_min == 0 and self._wpm > 0:
