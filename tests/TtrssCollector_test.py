@@ -1,6 +1,9 @@
 from custom_modules.TtrssCollector import TtrssCollector
 from TtrssCollector_mocks import MOCK_HEADLINE
+from http.server import BaseHTTPRequestHandler, HTTPServer
 import json
+import os
+import threading
 import unittest
 import unittest.mock as mock
 
@@ -282,7 +285,67 @@ class TestTtrssRequests(unittest.TestCase):
         resp = mock.Mock()
         resp.status_code = status
         resp.content = body
+        resp.is_redirect = False
         return resp
+
+    def test_a_redirect_is_not_followed_with_the_password(self):
+        """A 307 or 308 would make requests send the login body again to whatever
+        host the server names."""
+        received = []
+
+        class Elsewhere(BaseHTTPRequestHandler):
+            def do_POST(self):
+                received.append(self.rfile.read(int(self.headers['Content-Length'])))
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(b'{"content":{"session_id":"stolen"}}')
+
+            def log_message(self, *args):
+                pass
+
+        elsewhere = HTTPServer(('127.0.0.1', 0), Elsewhere)
+        target = f'http://127.0.0.1:{elsewhere.server_port}/api/'
+
+        class Redirecting(BaseHTTPRequestHandler):
+            def do_POST(self):
+                self.rfile.read(int(self.headers['Content-Length']))
+                self.send_response(308)
+                self.send_header('Location', target)
+                self.end_headers()
+
+            def log_message(self, *args):
+                pass
+
+        redirecting = HTTPServer(('127.0.0.1', 0), Redirecting)
+        for server in (elsewhere, redirecting):
+            threading.Thread(target=server.serve_forever, daemon=True).start()
+            self.addCleanup(server.server_close)
+            self.addCleanup(server.shutdown)
+        # A proxy from the environment would otherwise get these local requests.
+        no_proxy = os.environ.get('NO_PROXY', '')
+        env = mock.patch.dict(os.environ, {'NO_PROXY': f'{no_proxy},127.0.0.1', 'no_proxy': f'{no_proxy},127.0.0.1'})
+        env.start()
+        self.addCleanup(env.stop)
+
+        errors = []
+        inst = TtrssCollector(f'http://127.0.0.1:{redirecting.server_port}/api/', "USER", "PASSWORD-123",
+                              error_log_callback=errors.append)
+        with self.assertRaises(RuntimeError):
+            inst._login()
+
+        self.assertEqual(received, [])
+        self.assertIn(target, errors[0])
+
+    def test_a_relative_redirect_is_reported_as_a_full_url(self):
+        errors = []
+        inst = TtrssCollector("https://rss.example.com/api/", error_log_callback=errors.append)
+        resp = self.response(308)
+        resp.is_redirect = True
+        resp.headers = {'Location': '/tt-rss/api/'}
+        with mock.patch("custom_modules.TtrssCollector.requests.post", return_value=resp):
+            self.assertEqual(inst._send_ttrss_post_request('{"op":"login"}'), {})
+        self.assertIn("https://rss.example.com/tt-rss/api/", errors[0])
+        self.assertNotIn("PASSWORD-123", errors[0])
 
     def test_http_error_log_names_the_operation_not_the_request(self):
         errors = []
@@ -299,7 +362,7 @@ class TestTtrssRequests(unittest.TestCase):
         inst = TtrssCollector("testurl", "USER", 'pa"ss')
         sent = {}
 
-        def post(url, data):
+        def post(url, data, **kwargs):
             sent["body"] = data
             return self.response(200, b'{"content":{"session_id":"1"}}')
         with mock.patch("custom_modules.TtrssCollector.requests.post", side_effect=post):

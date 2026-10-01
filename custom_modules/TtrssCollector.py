@@ -4,6 +4,11 @@ import json
 import requests
 from custom_modules.ttrss_types import TtrssHeadline, TtrssResponse
 from typing import List, Dict, Optional, Sequence, Union, Callable
+from urllib.parse import urljoin
+
+
+# A server that stops answering would otherwise stall the whole run.
+REQUEST_TIMEOUT_SECONDS = 60
 
 class TtrssCollector(Collector):
     """
@@ -63,7 +68,14 @@ class TtrssCollector(Collector):
         return json.dumps(fields, separators=(",", ":"))
 
     def _send_ttrss_post_request(self, post_body: str) -> Union[TtrssResponse,Dict]:
-        response = requests.post(self._api_url, data=post_body)
+        # Not followed: on a 307 or 308 requests sends the same body, password included, to
+        # wherever the server points, which can be another host or plain http.
+        response = requests.post(self._api_url, data=post_body, allow_redirects=False, timeout=REQUEST_TIMEOUT_SECONDS)
+        if response.is_redirect:
+            location = urljoin(self._api_url, response.headers['Location'])
+            self.log_error(f'The tt-rss api answered with a redirect to {location}. '
+                           f'If that is your server, use it as the api url.')
+            return {}
         if response.status_code != 200:
             # Log the operation only: the login body holds the password.
             op = json.loads(post_body).get("op", "?")
