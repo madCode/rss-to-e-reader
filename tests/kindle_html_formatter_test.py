@@ -5,6 +5,23 @@ from default_modules.kindle_html_formatter import best_srcset_candidate, clean_h
 BASE = 'https://example.com/articles/one'
 
 class TestCleanHtml(unittest.TestCase):
+    def test_captions_outside_the_edge_of_a_figure_become_divs(self):
+        # Nested in a layout div inside the figure, as on Quanta Magazine.
+        self.assertEqual(
+            clean_html('<figure><img src="https://example.com/a.jpg"><div><figcaption><p>Photo: A. Person</p></figcaption></div></figure>'),
+            '<figure><img alt="" src="https://example.com/a.jpg"/><div><div><p>Photo: A. Person</p></div></div></figure>')
+        self.assertEqual(clean_html('<figcaption>Loose caption</figcaption><p>Text.</p>'), '<div>Loose caption</div><p>Text.</p>')
+        # A credit span is unwrapped to bare text, which leaves the caption short of the figure's end.
+        self.assertEqual(
+            clean_html('<figure><img src="https://example.com/a.jpg"><figcaption>Cap</figcaption><span>Photo: Getty</span></figure>'),
+            '<figure><img alt="" src="https://example.com/a.jpg"/><div>Cap</div>Photo: Getty</figure>')
+        # One caption per figure: the first of two goes, the last stays.
+        self.assertEqual(
+            clean_html('<figure><figcaption>A</figcaption><img src="https://example.com/a.jpg"><figcaption>B</figcaption></figure>'),
+            '<figure><div>A</div><img alt="" src="https://example.com/a.jpg"/><figcaption>B</figcaption></figure>')
+        valid = '<figure><img alt="" src="https://example.com/a.jpg"/><figcaption>Cap</figcaption></figure>'
+        self.assertEqual(clean_html(valid), valid)
+
     def test_plain_text_becomes_paragraphs(self):
         self.assertEqual(clean_html('first para\nstill first\n\nsecond <3'), '<p>first para still first</p><p>second &lt;3</p>')
         self.assertEqual(text_to_html(''), '')
