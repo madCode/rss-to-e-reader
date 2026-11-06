@@ -112,6 +112,36 @@ class TestCleanHtml(unittest.TestCase):
         html = '<p>Listen to this article</p><p>5 min read</p><p></p><div><span> </span></div><p>Keep me</p><p>Advertisement</p>'
         self.assertEqual(clean_html(html), '<p>Keep me</p>')
 
+    def test_boilerplate_variants(self):
+        for junk in ('5\u00a0min read', '5 min. read', '3-minute listen', 'Reading time: 4 minutes',
+                     'Listen to article', 'Share this article', 'Share on Bluesky',
+                     'Advertisement - Scroll to continue', 'Story continues below advertisement',
+                     'Continue reading the main story', 'Subscribe', 'Sign up for our weekly newsletter',
+                     'Subscribe to get these posts in your inbox', 'Click here to subscribe'):
+            self.assertEqual(clean_html(f'<p>{junk}</p><p>Keep me</p>'), '<p>Keep me</p>', junk)
+
+    def test_keeps_short_paragraphs_that_only_look_like_boilerplate(self):
+        for text in ('Sign up for a library card.', 'Subscribe to the calendar feed in your app.',
+                     'Click here to download the full dataset.', 'Share this with your kids.',
+                     '30 minutes listening to rain is restful.', '20 minutes reading aloud helps.',
+                     'Reading time matters more than screen time.'):
+            html = f'<ol><li>{text}</li></ol>'
+            self.assertEqual(clean_html(html), html, text)
+
+    def test_junk_classes_in_camel_case(self):
+        html = ('<div class="RelatedArticles_root__x1"><a href="https://a.com/x">Other story</a></div>'
+                '<div class="shareButtons">Tweet</div><div id="jp-relatedposts">Like this</div><p>Keep me</p>')
+        self.assertEqual(clean_html(html), '<p>Keep me</p>')
+
+    def test_keeps_code_comments_and_hero_banners(self):
+        # highlight.js and Prism mark code comments with a "comment" class
+        code = '<pre><code><span class="hljs-comment"># retry</span>\nretry() <span class="token comment">// x</span></code></pre>'
+        self.assertEqual(clean_html(code), '<pre><code># retry\nretry() // x</code></pre>')
+        body = '<p>' + 'word ' * 20 + '</p>'
+        hero = '<figure class="hero-banner"><img src="https://a.com/a.jpg"><figcaption>Lead</figcaption></figure>'
+        self.assertEqual(clean_html(hero + '<div class="cookie-banner">We use cookies</div>' + body).replace(body, ''),
+                         '<figure><img alt="" src="https://a.com/a.jpg"/><figcaption>Lead</figcaption></figure>')
+
     def test_layout_tables_are_flattened_data_tables_kept(self):
         data = '<table><tr><th>A</th><th>B</th></tr><tr><td>1</td><td>2</td></tr></table>'
         self.assertIn('<table>', clean_html(data))

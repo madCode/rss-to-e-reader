@@ -43,12 +43,17 @@ GLOBAL_ATTRIBUTES: Set[str] = {'id'}
 
 # class/id tokens that mark page furniture rather than article text.
 # Not 'paywall': sites like The New Yorker use it on the containers of the article's own paragraphs.
+# Not 'banner': role="banner" already catches site headers, and in article bodies the class is mostly
+# on hero images ("hero-banner", "article-banner"). Cookie and newsletter banners match other tokens.
 JUNK_TOKENS: Set[str] = {
-    'ad', 'ads', 'advert', 'advertisement', 'adsbygoogle', 'promo', 'promotion', 'newsletter', 'subscribe',
-    'subscription', 'signup', 'share', 'sharing', 'social', 'related', 'recommended', 'recommendations',
-    'comments', 'comment', 'sidebar', 'popup', 'modal', 'cookie', 'cookies', 'banner', 'sponsored',
-    'outbrain', 'taboola', 'breadcrumb', 'breadcrumbs', 'toolbar',
+    'ad', 'ads', 'advert', 'advertisement', 'advertising', 'adsbygoogle', 'promo', 'promotion', 'newsletter',
+    'subscribe', 'subscription', 'signup', 'share', 'sharing', 'social', 'related', 'relatedposts', 'recommended',
+    'recommendations', 'comments', 'comment', 'disqus', 'sidebar', 'popup', 'modal', 'cookie', 'cookies',
+    'sponsored', 'outbrain', 'taboola', 'breadcrumb', 'breadcrumbs', 'toolbar',
 }
+# Syntax highlighters mark code comments with these tokens ("hljs-comment", "token comment"), so elements
+# inside code are never checked against JUNK_TOKENS.
+CODE_TAGS: Set[str] = {'pre', 'code', 'samp', 'kbd'}
 
 # Attributes sites use to lazy-load images, in order of preference.
 LAZY_IMAGE_ATTRIBUTES: Tuple[str, ...] = (
@@ -62,16 +67,27 @@ EMPTY_REMOVABLE_TAGS: Set[str] = {
 BLOCK_TAGS: Set[str] = {'p', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'ul', 'ol', 'table', 'figure'}
 
 # Short paragraphs matching these are page furniture ("Listen to this article", "5 min read", ...).
+# Calls to action that are also everyday instructions ("Sign up for a library card", "Subscribe to the
+# calendar feed", "Click here to download the data") only match when they also mention a newsletter, email,
+# or "our"/"us" (the site itself), since how-to articles are full of short list items like these.
 BOILERPLATE_PATTERN = re.compile(
-    r'^(listen to (this|the) (article|essay|story|episode)|\d+[ -]min(ute)?s? (read|listen)|share (this|on)\b|'
-    r'advertisement$|sign up (for|to)\b|subscribe (to|now|today)\b|read more:|related:|recommended:|'
-    r'click here to\b|follow us on\b|skip past newsletter|after newsletter promotion)', re.I)
+    r'^(listen to (this |the )?(article|essay|story|episode)|'
+    r'\d+\s*[-\u2010-\u2013]?\s*min(ute)?s?\.?\s+(read|listen)\b|(estimated )?read(ing)? time\s*[:\-]?\s*\d|'
+    r'share (this$|this (article|story|post|page|essay)\b|on (facebook|twitter|x|linkedin|whatsapp|reddit|'
+    r'email|threads|bluesky|mastodon)\b)|'
+    r'advertisement(\s*[-\u2013\u2014:|\u00b7]\s*.*)?$|(the )?(article|story) continues (below|after)\b|'
+    r'continue reading (the main story|below)\b|'
+    r'(sign up|subscribe)( now| today)?$|subscribe (now|today)\b|'
+    r'(sign up|subscribe)\b.*\b(newsletters?|our|us|inbox|e-?mails?)\b|'
+    r'read more:|related:|recommended:|click here to (subscribe|sign up|join|register|donate|support)\b|'
+    r'follow us on\b|skip past newsletter|after newsletter promotion)', re.I)
 BOILERPLATE_MAX_WORDS = 12
 
 PREFERRED_IMAGE_WIDTH = 1000
 LAYOUT_TABLE_CELL_WORDS = 80
 _HTML_TAG_PATTERN = re.compile(r'<\s*[a-zA-Z!/]')
 _WHITESPACE = re.compile(r'\s+')
+_CAMEL_CASE_BOUNDARY = re.compile(r'(?<=[a-z])(?=[A-Z])')
 # Characters that mean the "url" is really mangled markup, not something worth percent-encoding.
 _MANGLED_URL_CHARACTERS = re.compile(r'["\\<>]')
 
@@ -156,7 +172,8 @@ def clean_for_kindle(parser: BeautifulSoup) -> BeautifulSoup:
 
 
 def _classes_and_id(element: Tag) -> List[str]:
-    value = f"{attr(element, 'class')} {attr(element, 'id')}".lower()
+    """Words in an element's class and id. camelCase is split too: CSS modules give "RelatedArticles_root__x1"."""
+    value = _CAMEL_CASE_BOUNDARY.sub(' ', f"{attr(element, 'class')} {attr(element, 'id')}").lower()
     return [t for t in re.split(r'[\s_\-]+', value) if t]
 
 
@@ -177,7 +194,7 @@ def _remove_hidden(soup: BeautifulSoup):
 def _remove_junk(soup: BeautifulSoup):
     total_words = len(soup.get_text(' ').split()) or 1
     for element in soup.find_all(True):
-        if element.decomposed or element.name in ('html', 'body', 'img'):
+        if element.decomposed or element.name in ('html', 'body', 'img') or element.find_parent(list(CODE_TAGS)):
             continue
         role = element.get('role')
         tokens = _classes_and_id(element)
