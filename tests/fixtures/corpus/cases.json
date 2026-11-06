@@ -1,0 +1,95 @@
+[
+  {
+    "name": "wordpress_blog",
+    "url": "https://allotment-notes.example/2026/04/12/cold-frame/",
+    "covers": "WordPress theme: Jetpack share buttons and related posts, comments, sidebar widgets, an email sign-up form and a Complianz cookie banner around the post.",
+    "known_issues": [
+      "The lazy-loaded figure (an SVG data: placeholder in src, the real image in data-lazy-src) is dropped with its caption: trafilatura discards it before clean_html can promote data-lazy-src."
+    ]
+  },
+  {
+    "name": "substack_post",
+    "url": "https://margins.substack.example/p/the-library-card",
+    "covers": "Substack post: subscribe widgets, like/share buttons, an SVG-laden heading anchor, a captioned image inside <picture>, and a footnote.",
+    "known_issues": [
+      "The image's figcaption is dropped by trafilatura.",
+      "The footnote number is left as bare text ('doubled.1', then a line with just '1'): the fragment links don't survive extraction."
+    ]
+  },
+  {
+    "name": "news_paywall",
+    "url": "https://www.ledger.example/2026/07/21/local/eastgate-night-market.html",
+    "covers": "Paywalled news story: the article body is aria-hidden and inert, interleaved with 'Advertisement' slots, a related-links block and a paywall gateway.",
+    "known_issues": [
+      "The photo is dropped; its caption survives with the credit run into it ('comment.Credit...Marcus Bell').",
+      "The 'What happens next' subheading comes out of trafilatura as a plain paragraph.",
+      "The 'A version of this article appears in print...' line is kept."
+    ]
+  },
+  {
+    "name": "jsonld_app_shell",
+    "url": "https://metro-weekly.example/transport/night-shift",
+    "covers": "JavaScript app shell whose visible page is a paywall teaser; the full text is only in the schema.org articleBody inside an @graph.",
+    "known_issues": [
+      "trafilatura finds the articleBody itself and returns it as one paragraph, so the json-ld stage (which splits on blank lines) never runs and the reader gets a single wall of text."
+    ]
+  },
+  {
+    "name": "ghost_tech_post",
+    "url": "https://field-notes.example/retries-are-a-load-test/",
+    "covers": "Ghost post: a code block, inline code, a data table, h1 subheadings inside the content, a captioned image card and a callout card.",
+    "known_issues": [
+      "The tag link ('Engineering') before the title is kept, and because it precedes the title heading, the repeated title isn't removed.",
+      "Inline <code> becomes a <pre> block inside the paragraph, splitting the sentence.",
+      "The image's caption and the callout card are dropped."
+    ]
+  },
+  {
+    "name": "medium_post",
+    "url": "https://walkabout.medium.example/i-walked-every-street-5d1c9a",
+    "covers": "Medium post: utility-class soup, clap/listen/share buttons, a <picture> with only <source> srcsets and no img src, and 'More from' recommendations.",
+    "known_issues": [
+      "The author's avatar, the byline line ('Sam Adeyemi7 min read·Jan 18, 2026') and the clap count ('2.1K') are kept as article text.",
+      "The main figure (srcset only on <source>) is dropped with its caption."
+    ]
+  },
+  {
+    "name": "wiki_article",
+    "url": "https://en.openencyclopedia.example/wiki/Drystone_wall",
+    "covers": "MediaWiki page: infobox, table of contents, [edit] section links, citation superscripts, a reference list, a navbox and category links.",
+    "known_issues": [
+      "'[ edit]' is kept after every section heading.",
+      "The reference list is dropped, leaving an empty 'References' heading and unlinked [1] markers.",
+      "The infobox image is dropped; the infobox itself is kept as a table."
+    ]
+  },
+  {
+    "name": "magazine_longform",
+    "url": "https://www.northerly.example/magazine/2026/08/09/last-lighthouse-keeper",
+    "covers": "Magazine feature: paragraphs split across 'paywall'-classed containers, a drop-cap lead-in span, an in-content ad, a pull quote, a 'Read more:' link, a newsletter sign-up and a OneTrust cookie banner.",
+    "known_issues": [
+      "The dek (subtitle) and the contributor bio are dropped."
+    ]
+  },
+  {
+    "name": "email_newsletter",
+    "url": "https://news.greenhouse-letter.example/view/2026-10",
+    "extract": false,
+    "title": "The Greenhouse Letter: October",
+    "covers": "Email newsletter delivered as feed content (not fetched, so only clean_html runs): nested role=presentation layout tables, a hidden preheader, a two-column image/text row, a social-links row and a tracking pixel.",
+    "known_issues": [
+      "'View in browser', the logo, the 'Share this letter with a friend' button and the unsubscribe footer are kept."
+    ]
+  },
+  {
+    "name": "wordpress_feed_content",
+    "url": "https://allotment-notes.example/2026/10/27/dahlias/",
+    "extract": false,
+    "title": "Lifting and Storing Dahlias",
+    "covers": "A WordPress RSS item's content:encoded (not fetched, so only clean_html runs): a lazy-loaded image with a relative data-src, the 'more' marker, Jetpack share buttons and related posts, a '5 min read' line and a stats pixel.",
+    "known_issues": [
+      "Jetpack's related posts ('### Related', 'Planting tulips late') are kept: its class and id are 'jp-relatedposts', which splits into the tokens 'jp' and 'relatedposts', neither of them in JUNK_TOKENS.",
+      "The 'The post ... appeared first on ...' line WordPress adds to feeds is kept."
+    ]
+  }
+]

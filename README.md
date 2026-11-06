@@ -28,6 +28,8 @@ The result is then cleaned up for e-readers (`default_modules/kindle_html_format
 
 Some sites turn away scripts based on how the connection looks (its TLS and HTTP/2 fingerprint), whatever the User-Agent says. When a request looks blocked (a 401/403/429/503, or a bot-check page), it's retried with [curl_cffi](https://github.com/lexiforest/curl_cffi) impersonating Chrome. Plain requests are tried first because a few sites do the opposite. Choose the browser with `DefaultArticleFetcher(..., impersonate_browser='safari')`, or turn this off with `impersonate_browser=None`. It won't get past JavaScript challenges ("Just a moment...") or real paywalls; for sites you subscribe to, pass a `requests.Session` carrying your cookies as `session=` (they're used for the impersonated retry too). curl_cffi is optional: without it, blocked pages simply aren't retried.
 
+`tests/article_corpus_test.py` runs a corpus of saved pages (WordPress, Substack, Ghost, Medium, MediaWiki, paywalled news, an email newsletter, ...) through the whole pipeline and compares the result with `tests/fixtures/corpus/*.expected.md`. Each case in `cases.json` lists where extraction still falls short. After a deliberate change, regenerate the expected files with `UPDATE_CORPUS=1 python -m unittest discover -s tests -p article_corpus_test.py` and check the diff.
+
 To see how well a page extracts, run `python3 sample_urls_to_epub.py <url> [<url> ...] -o test` and open `test.epub`.
 
 ## Basic Usage

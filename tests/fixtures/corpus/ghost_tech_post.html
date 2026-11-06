@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<title>Retries Are a Load Test You Didn't Schedule</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="canonical" href="https://field-notes.example/retries-are-a-load-test/">
+<meta property="og:site_name" content="Field Notes">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Retries Are a Load Test You Didn't Schedule">
+<meta property="article:published_time" content="2026-05-30T16:20:00.000Z">
+<meta property="article:tag" content="Engineering">
+<meta name="generator" content="Ghost 5.88">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","publisher":{"@type":"Organization","name":"Field Notes"},"author":{"@type":"Person","name":"Mei Chen","url":"https://field-notes.example/author/mei/"},"headline":"Retries Are a Load Test You Didn't Schedule","datePublished":"2026-05-30T16:20:00.000Z"}</script>
+<link rel="stylesheet" type="text/css" href="/assets/built/screen.css?v=8d1c0b">
+</head>
+<body class="post-template tag-engineering">
+<div class="viewport">
+<header id="gh-head" class="gh-head outer"><div class="gh-head-inner inner"><div class="gh-head-brand"><a class="gh-head-logo" href="https://field-notes.example">Field Notes</a></div>
+<nav class="gh-head-menu"><ul class="nav"><li class="nav-home"><a href="/">Home</a></li><li class="nav-archive"><a href="/archive/">Archive</a></li></ul></nav>
+<div class="gh-head-actions"><a class="gh-head-button" href="#/portal/signup" data-portal="signup">Subscribe</a></div></div></header>
+<div class="site-content"><main id="site-main" class="site-main">
+<article class="article post tag-engineering">
+<header class="article-header gh-canvas">
+  <section class="article-tag"><a href="/tag/engineering/">Engineering</a></section>
+  <h1 class="article-title">Retries Are a Load Test You Didn't Schedule</h1>
+  <div class="article-byline"><div class="article-byline-content"><ul class="author-list"><li class="author-list-item"><a href="/author/mei/" class="author-avatar"><img class="author-profile-image" src="/content/images/size/w100/2026/01/mei.jpg" alt="Mei Chen"></a></li></ul>
+  <div class="article-byline-meta"><h4 class="author-name"><a href="/author/mei/">Mei Chen</a></h4><div class="byline-meta-content"><time class="byline-meta-date" datetime="2026-05-30">May 30, 2026</time><span class="byline-reading-time"><span class="bull">&bull;</span> 6 min read</span></div></div></div></div>
+</header>
+<section class="gh-content gh-canvas">
+<p>Last winter one of our services fell over for forty minutes. The root cause was a slow database query, but the reason it took the whole service down was something we had added on purpose: retries. Every client that timed out tried again, and then again, and the database that was struggling with one copy of the load was suddenly handling four.</p>
+<p>Retries are one of those things that are obviously good in isolation. A single request that fails because of a brief network blip should be tried again. The trouble is that failures are rarely isolated. When something goes wrong, it tends to go wrong for everyone at once.</p>
+<h1 id="the-arithmetic">The arithmetic</h1>
+<p>Suppose each layer of a call chain retries three times. A request that passes through three layers can turn into <code>3 × 3 × 3 = 27</code> attempts at the bottom layer. That multiplier only shows up when the bottom layer is already in trouble, which is the worst possible moment for it.</p>
+<table>
+<thead><tr><th>Layers</th><th>Retries per layer</th><th>Worst-case attempts</th></tr></thead>
+<tbody><tr><td>1</td><td>3</td><td>3</td></tr><tr><td>2</td><td>3</td><td>9</td></tr><tr><td>3</td><td>3</td><td>27</td></tr></tbody>
+</table>
+<h2 id="what-we-changed">What we changed</h2>
+<p>We now retry in exactly one place, at the edge of the system, and every retry waits a little longer than the last with some randomness mixed in so that clients don't all come back at the same moment:</p>
+<pre><code class="language-python">def backoff(attempt, base=0.2, cap=10.0):
+    delay = min(cap, base * 2 ** attempt)
+    return random.uniform(0, delay)
+</code></pre>
+<p>We also added a retry budget: if more than a tenth of recent requests are retries, the client stops retrying altogether and fails fast. That sounds alarming, but a quick, honest error is much easier to recover from than a slow pile-up.</p>
+<figure class="kg-card kg-image-card kg-card-hascaption"><img src="/content/images/2026/05/retry-graph.png" class="kg-image" alt="Request rate during the incident" loading="lazy" width="1600" height="900" srcset="/content/images/size/w600/2026/05/retry-graph.png 600w, /content/images/size/w1000/2026/05/retry-graph.png 1000w, /content/images/size/w1600/2026/05/retry-graph.png 1600w" sizes="(min-width: 720px) 720px"><figcaption><span style="white-space: pre-wrap;">Requests per second at the database during the incident. The second peak is almost entirely retries.</span></figcaption></figure>
+<h2 id="the-lesson">The lesson</h2>
+<p>The general lesson is that any mechanism that adds work in response to failure needs a limit. Retries, reconnects, cache refills and autoscaling all share this shape. Each is sensible on its own, and each can turn a small problem into a large one when everything triggers it at once.</p>
+<div class="kg-card kg-callout-card kg-callout-card-blue"><div class="kg-callout-emoji">💡</div><div class="kg-callout-text">If you only change one thing, make sure there is a single layer that owns retries.</div></div>
+</section>
+</article>
+<section class="article-comments gh-canvas"><div id="ghost-comments-root"></div></section>
+<aside class="read-more-wrap outer"><div class="read-more inner"><article class="post-card"><a class="post-card-image-link" href="/timeouts/"><img class="post-card-image" src="/content/images/size/w600/2026/02/clock.jpg" alt="Timeouts"></a><div class="post-card-content"><h2 class="post-card-title">Every Timeout Is a Guess</h2></div></article></div></aside>
+</main></div>
+<footer class="site-footer outer"><div class="inner"><section class="copyright"><a href="https://field-notes.example">Field Notes</a> &copy; 2026</section><div class="gh-powered-by"><a href="https://ghost.org/" target="_blank" rel="noopener">Powered by Ghost</a></div></div></footer>
+</div>
+<div class="gh-portal-triggerbtn-wrapper"><div class="gh-portal-triggerbtn-container with-label"><span class="gh-portal-triggerbtn-label">Subscribe</span></div></div>
+</body>
+</html>
