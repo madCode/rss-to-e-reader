@@ -51,8 +51,8 @@ JUNK_TOKENS: Set[str] = {
     'recommendations', 'comments', 'comment', 'disqus', 'sidebar', 'popup', 'modal', 'cookie', 'cookies',
     'sponsored', 'outbrain', 'taboola', 'breadcrumb', 'breadcrumbs', 'toolbar',
 }
-# Syntax highlighters mark code comments with these tokens ("hljs-comment", "token comment"), so elements
-# inside code are never checked against JUNK_TOKENS.
+# Syntax highlighters mark code comments with junk tokens ("hljs-comment", "token comment"), and code can
+# print anything ("Subscribe now"), so elements inside code are never checked for junk or boilerplate.
 CODE_TAGS: Set[str] = {'pre', 'code', 'samp', 'kbd'}
 
 # Attributes sites use to lazy-load images, in order of preference.
@@ -68,18 +68,19 @@ BLOCK_TAGS: Set[str] = {'p', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockqu
 
 # Short paragraphs matching these are page furniture ("Listen to this article", "5 min read", ...).
 # Calls to action that are also everyday instructions ("Sign up for a library card", "Subscribe to the
-# calendar feed", "Click here to download the data") only match when they also mention a newsletter, email,
-# or "our"/"us" (the site itself), since how-to articles are full of short list items like these.
+# calendar feed", "Click here to download the data") only match when they also mention a newsletter, an inbox
+# or "our" (the site itself), since how-to articles are full of short list items like these. "Email" is not
+# a marker: real instructions mention it too ("Sign up for an account, then confirm your email").
 BOILERPLATE_PATTERN = re.compile(
-    r'^(listen to (this |the )?(article|essay|story|episode)|'
-    r'\d+\s*[-\u2010-\u2013]?\s*min(ute)?s?\.?\s+(read|listen)\b|(estimated )?read(ing)? time\s*[:\-]?\s*\d|'
-    r'share (this$|this (article|story|post|page|essay)\b|on (facebook|twitter|x|linkedin|whatsapp|reddit|'
+    r'^(listen to (this |the )?(article|essay|story|episode)\b|'
+    r'\d+\s*[-\u2010-\u2013]?\s*min(ute)?s?\.?\s+(read|listen)\b|(estimated )?read(ing)? time\s*[:\-]?\s*\d+\s*min(ute)?s?\.?$|'
+    r'share (this:?$|this (article|story|post|page|essay)\b|on (facebook|twitter|x|linkedin|whatsapp|reddit|'
     r'email|threads|bluesky|mastodon)\b)|'
-    r'advertisement(\s*[-\u2013\u2014:|\u00b7]\s*.*)?$|(the )?(article|story) continues (below|after)\b|'
+    r'advertisement(\s*[-\u2013\u2014:|\u00b7]?\s*(scroll|continue|story continues|article continues)\b.*)?$|(the )?(article|story) continues (below|after)\b|'
     r'continue reading (the main story|below)\b|'
     r'(sign up|subscribe)( now| today)?$|subscribe (now|today)\b|'
-    r'(sign up|subscribe)\b.*\b(newsletters?|our|us|inbox|e-?mails?)\b|'
-    r'read more:|related:|recommended:|click here to (subscribe|sign up|join|register|donate|support)\b|'
+    r'(sign up|subscribe)\b.*\b(newsletters?|our|inbox)\b|'
+    r'read more(:|$)|related:|recommended:|click here to (subscribe|sign up|join|register|donate|support|read more)\b|'
     r'follow us on\b|skip past newsletter|after newsletter promotion)', re.I)
 BOILERPLATE_MAX_WORDS = 12
 
@@ -87,7 +88,6 @@ PREFERRED_IMAGE_WIDTH = 1000
 LAYOUT_TABLE_CELL_WORDS = 80
 _HTML_TAG_PATTERN = re.compile(r'<\s*[a-zA-Z!/]')
 _WHITESPACE = re.compile(r'\s+')
-_CAMEL_CASE_BOUNDARY = re.compile(r'(?<=[a-z])(?=[A-Z])')
 # Characters that mean the "url" is really mangled markup, not something worth percent-encoding.
 _MANGLED_URL_CHARACTERS = re.compile(r'["\\<>]')
 
@@ -172,8 +172,7 @@ def clean_for_kindle(parser: BeautifulSoup) -> BeautifulSoup:
 
 
 def _classes_and_id(element: Tag) -> List[str]:
-    """Words in an element's class and id. camelCase is split too: CSS modules give "RelatedArticles_root__x1"."""
-    value = _CAMEL_CASE_BOUNDARY.sub(' ', f"{attr(element, 'class')} {attr(element, 'id')}").lower()
+    value = f"{attr(element, 'class')} {attr(element, 'id')}".lower()
     return [t for t in re.split(r'[\s_\-]+', value) if t]
 
 
@@ -191,10 +190,16 @@ def _remove_hidden(soup: BeautifulSoup):
                 element.decompose()
 
 
+def _inside_code(soup: BeautifulSoup) -> Set[int]:
+    """ids (id()) of the elements nested in code blocks. One pass, rather than a find_parent() per element."""
+    return {id(element) for block in soup.find_all(list(CODE_TAGS)) for element in block.find_all(True)}
+
+
 def _remove_junk(soup: BeautifulSoup):
     total_words = len(soup.get_text(' ').split()) or 1
+    inside_code = _inside_code(soup)
     for element in soup.find_all(True):
-        if element.decomposed or element.name in ('html', 'body', 'img') or element.find_parent(list(CODE_TAGS)):
+        if element.decomposed or element.name in ('html', 'body', 'img') or id(element) in inside_code:
             continue
         role = element.get('role')
         tokens = _classes_and_id(element)
@@ -205,8 +210,9 @@ def _remove_junk(soup: BeautifulSoup):
 
 
 def _remove_boilerplate(soup: BeautifulSoup):
+    inside_code = _inside_code(soup)
     for element in soup.find_all(['p', 'div', 'li', 'span', 'h2', 'h3', 'h4', 'h5', 'h6']):
-        if element.decomposed:
+        if element.decomposed or id(element) in inside_code:
             continue
         text = element.get_text(' ', strip=True)
         if len(text.split()) <= BOILERPLATE_MAX_WORDS and BOILERPLATE_PATTERN.match(text):
