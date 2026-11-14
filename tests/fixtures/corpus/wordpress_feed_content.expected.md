@@ -9,6 +9,4 @@ Cut the stems down to a hand’s length, then lift each clump with a fork from w
 2. Pack them in a crate of dry compost or sawdust, crowns up.
 3. Keep the crate somewhere cool and frost-free, and check them once a month.
 The year I skipped the draining step, half of them rotted by January. The crowns had held water, and that was enough. Now I label every crate with the variety and the date, because by spring I never remember which brown lump is which.
-### Related
-Planting tulips late
 The post Lifting and Storing Dahlias appeared first on Allotment Notes.
