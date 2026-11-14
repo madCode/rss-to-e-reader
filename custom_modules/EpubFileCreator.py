@@ -215,7 +215,9 @@ class EpubFileCreator(FileCreator):
             book.set_cover('cover.jpg', self._cover(), create_page=True)
             # ebooklib marks the cover page non-linear, which EPUB validators (and Send to Kindle) reject
             # unless something links to it.
-            book.get_item_with_id('cover').is_linear = True
+            cover_page = book.get_item_with_id('cover')
+            if cover_page is not None:  # set_cover(create_page=True) always adds it; the check is for mypy
+                cover_page.is_linear = True
 
         soups = []
         for article in self.articles:
